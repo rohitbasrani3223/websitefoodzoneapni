@@ -13,6 +13,7 @@ export const OrderStatusUpdateStatus = {
   received: 'received',
   preparing: 'preparing',
   ready: 'ready',
+  'out-for-delivery': 'out-for-delivery',
   completed: 'completed',
   cancelled: 'cancelled',
 } as const;

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   ShoppingBag, TrendingUp, Clock, CheckCircle2, Utensils,
   LogOut, Plus, Edit2, Trash2, ToggleLeft, ToggleRight,
-  BarChart3, ChevronDown, X, Save
+  BarChart3, ChevronDown, X, Save, Bike, MapPin
 } from "lucide-react";
 import {
   useGetDashboardStats,
@@ -23,13 +23,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
-const ORDER_STATUSES = ["received", "preparing", "ready", "completed", "cancelled"] as const;
+const ORDER_STATUSES = ["received", "preparing", "ready", "out-for-delivery", "completed", "cancelled"] as const;
 type OrderStatus = typeof ORDER_STATUSES[number];
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
   received: "bg-blue-500/15 text-blue-400 border-blue-500/30",
   preparing: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   ready: "bg-green-500/15 text-green-400 border-green-500/30",
+  "out-for-delivery": "bg-primary/15 text-primary border-primary/30",
   completed: "bg-muted text-muted-foreground border-border",
   cancelled: "bg-destructive/15 text-destructive border-destructive/30",
 };
@@ -213,44 +214,76 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {orders.map((order) => (
-                  <div key={order.id} data-testid={`order-card-${order.id}`} className="bg-card border border-border rounded-2xl p-5">
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div>
-                        <p className="font-bold text-foreground">#{order.id} — {order.customerName}</p>
-                        <p className="text-muted-foreground text-xs">{order.phone} &middot; {order.orderType}</p>
-                        <p className="text-muted-foreground text-xs">{new Date(order.createdAt).toLocaleString()}</p>
+                {orders.map((order) => {
+                  const isDelivery = order.orderType === "delivery";
+                  const validNextStatuses = ORDER_STATUSES.filter((s) => {
+                    if (s === order.status || s === "received") return false;
+                    if (s === "out-for-delivery" && !isDelivery) return false;
+                    if (s === "ready" && isDelivery) return false;
+                    return true;
+                  });
+                  return (
+                    <div key={order.id} data-testid={`order-card-${order.id}`} className={`bg-card border rounded-2xl p-5 ${isDelivery ? "border-primary/30" : "border-border"}`}>
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className="font-bold text-foreground">#{order.id} — {order.customerName}</p>
+                            {isDelivery && (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-primary/15 text-primary px-2 py-0.5 rounded-full">
+                                <Bike className="w-3 h-3" /> Delivery
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-muted-foreground text-xs">{order.phone} &middot; {isDelivery ? "Delivery" : order.orderType}</p>
+                          <p className="text-muted-foreground text-xs">{new Date(order.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-primary font-black">₹{order.total}</p>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${STATUS_COLORS[order.status as OrderStatus] ?? ""}`}>
+                            {order.status === "out-for-delivery" ? "Out for Delivery" : order.status}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-primary font-black">₹{order.total}</p>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border capitalize ${STATUS_COLORS[order.status as OrderStatus] ?? ""}`}>
-                          {order.status}
-                        </span>
-                      </div>
-                    </div>
 
-                    <div className="text-xs text-muted-foreground mb-3">
-                      {(order.items as Array<{ name: string; quantity: number }>).map((i, idx) => (
-                        <span key={idx}>{i.name} ×{i.quantity}{idx < order.items.length - 1 ? ", " : ""}</span>
-                      ))}
-                    </div>
+                      {/* Delivery address */}
+                      {isDelivery && order.deliveryAddress && (
+                        <div className="mb-3 px-3 py-2 bg-primary/5 border border-primary/15 rounded-xl text-xs space-y-0.5">
+                          <div className="flex items-center gap-1.5 text-primary font-semibold">
+                            <MapPin className="w-3 h-3" /> Delivery Address
+                          </div>
+                          {order.deliveryArea && <p className="text-muted-foreground pl-4">{order.deliveryArea}</p>}
+                          <p className="text-foreground pl-4">{order.deliveryAddress}</p>
+                          {order.deliveryLandmark && <p className="text-muted-foreground pl-4">Near: {order.deliveryLandmark}</p>}
+                        </div>
+                      )}
 
-                    {order.status !== "completed" && order.status !== "cancelled" && (
-                      <div className="flex gap-2 flex-wrap">
-                        {ORDER_STATUSES.filter((s) => s !== order.status && s !== "received").map((s) => (
-                          <button
-                            key={s}
-                            onClick={() => handleStatusChange(order.id, s)}
-                            data-testid={`button-status-${order.id}-${s}`}
-                            className="text-xs px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground font-medium capitalize transition-colors border border-border"
-                          >
-                            Mark {s}
-                          </button>
+                      <div className="text-xs text-muted-foreground mb-3">
+                        {(order.items as Array<{ name: string; quantity: number }>).map((i, idx) => (
+                          <span key={idx}>{i.name} ×{i.quantity}{idx < order.items.length - 1 ? ", " : ""}</span>
                         ))}
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {order.status !== "completed" && order.status !== "cancelled" && (
+                        <div className="flex gap-2 flex-wrap">
+                          {validNextStatuses.map((s) => (
+                            <button
+                              key={s}
+                              onClick={() => handleStatusChange(order.id, s)}
+                              data-testid={`button-status-${order.id}-${s}`}
+                              className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors border ${
+                                s === "out-for-delivery"
+                                  ? "bg-primary/10 border-primary/30 text-primary hover:bg-primary/20"
+                                  : "bg-muted hover:bg-muted/80 text-foreground border-border"
+                              }`}
+                            >
+                              {s === "out-for-delivery" ? "Mark Out for Delivery" : `Mark ${s}`}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

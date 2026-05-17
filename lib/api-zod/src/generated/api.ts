@@ -188,10 +188,14 @@ export const ListOrdersResponseItem = zod.object({
   "size": zod.string().nullish()
 })),
   "total": zod.number(),
-  "status": zod.enum(['received', 'preparing', 'ready', 'completed', 'cancelled']),
-  "orderType": zod.enum(['dine-in', 'takeaway']),
+  "status": zod.enum(['received', 'preparing', 'ready', 'out-for-delivery', 'completed', 'cancelled']),
+  "orderType": zod.enum(['dine-in', 'takeaway', 'delivery']),
   "notes": zod.string().nullish(),
   "tableNumber": zod.string().nullish(),
+  "deliveryAddress": zod.string().nullish(),
+  "deliveryLandmark": zod.string().nullish(),
+  "deliveryArea": zod.string().nullish(),
+  "deliveryCharge": zod.number().optional(),
   "createdAt": zod.string()
 })
 export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
@@ -210,9 +214,13 @@ export const CreateOrderBody = zod.object({
   "quantity": zod.number(),
   "size": zod.string().nullish()
 })),
-  "orderType": zod.enum(['dine-in', 'takeaway']),
+  "orderType": zod.enum(['dine-in', 'takeaway', 'delivery']),
   "notes": zod.string().nullish(),
-  "tableNumber": zod.string().nullish()
+  "tableNumber": zod.string().nullish(),
+  "deliveryAddress": zod.string().nullish(),
+  "deliveryLandmark": zod.string().nullish(),
+  "deliveryArea": zod.string().nullish(),
+  "deliveryCharge": zod.number().optional()
 })
 
 
@@ -235,10 +243,14 @@ export const GetOrderResponse = zod.object({
   "size": zod.string().nullish()
 })),
   "total": zod.number(),
-  "status": zod.enum(['received', 'preparing', 'ready', 'completed', 'cancelled']),
-  "orderType": zod.enum(['dine-in', 'takeaway']),
+  "status": zod.enum(['received', 'preparing', 'ready', 'out-for-delivery', 'completed', 'cancelled']),
+  "orderType": zod.enum(['dine-in', 'takeaway', 'delivery']),
   "notes": zod.string().nullish(),
   "tableNumber": zod.string().nullish(),
+  "deliveryAddress": zod.string().nullish(),
+  "deliveryLandmark": zod.string().nullish(),
+  "deliveryArea": zod.string().nullish(),
+  "deliveryCharge": zod.number().optional(),
   "createdAt": zod.string()
 })
 
@@ -251,7 +263,7 @@ export const UpdateOrderStatusParams = zod.object({
 })
 
 export const UpdateOrderStatusBody = zod.object({
-  "status": zod.enum(['received', 'preparing', 'ready', 'completed', 'cancelled'])
+  "status": zod.enum(['received', 'preparing', 'ready', 'out-for-delivery', 'completed', 'cancelled'])
 })
 
 export const UpdateOrderStatusResponse = zod.object({
@@ -266,10 +278,14 @@ export const UpdateOrderStatusResponse = zod.object({
   "size": zod.string().nullish()
 })),
   "total": zod.number(),
-  "status": zod.enum(['received', 'preparing', 'ready', 'completed', 'cancelled']),
-  "orderType": zod.enum(['dine-in', 'takeaway']),
+  "status": zod.enum(['received', 'preparing', 'ready', 'out-for-delivery', 'completed', 'cancelled']),
+  "orderType": zod.enum(['dine-in', 'takeaway', 'delivery']),
   "notes": zod.string().nullish(),
   "tableNumber": zod.string().nullish(),
+  "deliveryAddress": zod.string().nullish(),
+  "deliveryLandmark": zod.string().nullish(),
+  "deliveryArea": zod.string().nullish(),
+  "deliveryCharge": zod.number().optional(),
   "createdAt": zod.string()
 })
 

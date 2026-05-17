@@ -90,6 +90,7 @@ export const OrderStatus = {
   received: 'received',
   preparing: 'preparing',
   ready: 'ready',
+  'out-for-delivery': 'out-for-delivery',
   completed: 'completed',
   cancelled: 'cancelled',
 } as const;
@@ -100,6 +101,7 @@ export type OrderOrderType = typeof OrderOrderType[keyof typeof OrderOrderType];
 export const OrderOrderType = {
   'dine-in': 'dine-in',
   takeaway: 'takeaway',
+  delivery: 'delivery',
 } as const;
 
 export interface Order {
@@ -114,6 +116,13 @@ export interface Order {
   notes?: string | null;
   /** @nullable */
   tableNumber?: string | null;
+  /** @nullable */
+  deliveryAddress?: string | null;
+  /** @nullable */
+  deliveryLandmark?: string | null;
+  /** @nullable */
+  deliveryArea?: string | null;
+  deliveryCharge?: number;
   createdAt: string;
 }
 
@@ -123,6 +132,7 @@ export type OrderInputOrderType = typeof OrderInputOrderType[keyof typeof OrderI
 export const OrderInputOrderType = {
   'dine-in': 'dine-in',
   takeaway: 'takeaway',
+  delivery: 'delivery',
 } as const;
 
 export interface OrderInput {
@@ -134,6 +144,13 @@ export interface OrderInput {
   notes?: string | null;
   /** @nullable */
   tableNumber?: string | null;
+  /** @nullable */
+  deliveryAddress?: string | null;
+  /** @nullable */
+  deliveryLandmark?: string | null;
+  /** @nullable */
+  deliveryArea?: string | null;
+  deliveryCharge?: number;
 }
 
 export type OrderStatusUpdateStatus = typeof OrderStatusUpdateStatus[keyof typeof OrderStatusUpdateStatus];
@@ -143,6 +160,7 @@ export const OrderStatusUpdateStatus = {
   received: 'received',
   preparing: 'preparing',
   ready: 'ready',
+  'out-for-delivery': 'out-for-delivery',
   completed: 'completed',
   cancelled: 'cancelled',
 } as const;

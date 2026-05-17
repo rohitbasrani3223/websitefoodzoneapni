@@ -17,4 +17,11 @@ export interface OrderInput {
   notes?: string | null;
   /** @nullable */
   tableNumber?: string | null;
+  /** @nullable */
+  deliveryAddress?: string | null;
+  /** @nullable */
+  deliveryLandmark?: string | null;
+  /** @nullable */
+  deliveryArea?: string | null;
+  deliveryCharge?: number;
 }

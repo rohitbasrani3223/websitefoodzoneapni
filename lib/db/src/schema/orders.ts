@@ -18,6 +18,11 @@ export const ordersTable = pgTable("orders", {
   orderType: text("order_type").notNull().default("takeaway"),
   notes: text("notes"),
   tableNumber: text("table_number"),
+  // Delivery fields
+  deliveryAddress: text("delivery_address"),
+  deliveryLandmark: text("delivery_landmark"),
+  deliveryArea: text("delivery_area"),
+  deliveryCharge: numeric("delivery_charge", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

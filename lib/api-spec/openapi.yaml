@@ -469,14 +469,22 @@ components:
           type: number
         status:
           type: string
-          enum: [received, preparing, ready, completed, cancelled]
+          enum: [received, preparing, ready, out-for-delivery, completed, cancelled]
         orderType:
           type: string
-          enum: [dine-in, takeaway]
+          enum: [dine-in, takeaway, delivery]
         notes:
           type: ["string", "null"]
         tableNumber:
           type: ["string", "null"]
+        deliveryAddress:
+          type: ["string", "null"]
+        deliveryLandmark:
+          type: ["string", "null"]
+        deliveryArea:
+          type: ["string", "null"]
+        deliveryCharge:
+          type: number
         createdAt:
           type: string
 
@@ -494,11 +502,19 @@ components:
             $ref: "#/components/schemas/OrderItem"
         orderType:
           type: string
-          enum: [dine-in, takeaway]
+          enum: [dine-in, takeaway, delivery]
         notes:
           type: ["string", "null"]
         tableNumber:
           type: ["string", "null"]
+        deliveryAddress:
+          type: ["string", "null"]
+        deliveryLandmark:
+          type: ["string", "null"]
+        deliveryArea:
+          type: ["string", "null"]
+        deliveryCharge:
+          type: number
 
     OrderStatusUpdate:
       type: object
@@ -506,7 +522,7 @@ components:
       properties:
         status:
           type: string
-          enum: [received, preparing, ready, completed, cancelled]
+          enum: [received, preparing, ready, out-for-delivery, completed, cancelled]
 
     AdminLoginInput:
       type: object

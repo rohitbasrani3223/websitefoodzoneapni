@@ -12,4 +12,5 @@ export type OrderOrderType = typeof OrderOrderType[keyof typeof OrderOrderType];
 export const OrderOrderType = {
   'dine-in': 'dine-in',
   takeaway: 'takeaway',
+  delivery: 'delivery',
 } as const;

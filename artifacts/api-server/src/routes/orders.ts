@@ -10,6 +10,8 @@ import {
   UpdateOrderStatusBody,
 } from "@workspace/api-zod";
 
+const DELIVERY_CHARGE = 30;
+
 const router = Router();
 
 router.get("/orders", async (req, res) => {
@@ -33,7 +35,18 @@ router.post("/orders", async (req, res) => {
     return;
   }
   const data = parsed.data;
-  const total = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  const isDelivery = data.orderType === "delivery";
+
+  if (isDelivery && !data.deliveryAddress) {
+    res.status(400).json({ error: "Delivery address is required for delivery orders" });
+    return;
+  }
+
+  const itemsTotal = data.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const deliveryCharge = isDelivery ? DELIVERY_CHARGE : 0;
+  const total = itemsTotal + deliveryCharge;
+
   const [order] = await db.insert(ordersTable).values({
     customerName: data.customerName,
     phone: data.phone,
@@ -43,6 +56,10 @@ router.post("/orders", async (req, res) => {
     orderType: data.orderType,
     notes: data.notes ?? null,
     tableNumber: data.tableNumber ?? null,
+    deliveryAddress: isDelivery ? (data.deliveryAddress ?? null) : null,
+    deliveryLandmark: isDelivery ? (data.deliveryLandmark ?? null) : null,
+    deliveryArea: isDelivery ? (data.deliveryArea ?? null) : null,
+    deliveryCharge: String(deliveryCharge),
   }).returning();
 
   const menuItemIds = data.items.map((i) => i.menuItemId);
@@ -104,6 +121,10 @@ function formatOrder(order: typeof ordersTable.$inferSelect) {
     orderType: order.orderType,
     notes: order.notes ?? null,
     tableNumber: order.tableNumber ?? null,
+    deliveryAddress: order.deliveryAddress ?? null,
+    deliveryLandmark: order.deliveryLandmark ?? null,
+    deliveryArea: order.deliveryArea ?? null,
+    deliveryCharge: Number(order.deliveryCharge ?? 0),
     createdAt: order.createdAt.toISOString(),
   };
 }
