@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag, User, Phone, MapPin, FileText, Home, Navigation, Bike, Copy, Check, Star, ExternalLink, Smartphone } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag, User, Phone, MapPin, FileText, Home, Navigation, Bike, Copy, Check, Star, ExternalLink, Smartphone, Clock, Upload, X, Trash } from "lucide-react";
 import { useCreateOrder } from "@workspace/api-client-react";
 import { useCart } from "@/context/cart";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,87 @@ export default function CartPage() {
   const deliveryCharge = isDelivery ? DELIVERY_CHARGE : 0;
   const grandTotal = subtotal + gst + deliveryCharge;
 
+  const [showUpiModal, setShowUpiModal] = useState(false);
+  const [screenshot, setScreenshot] = useState<File | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState(300);
+
+  // Timer countdown
+  useEffect(() => {
+    if (!showUpiModal) return;
+    if (timeLeft <= 0) {
+      setShowUpiModal(false);
+      setScreenshot(null);
+      setScreenshotPreview(null);
+      toast({
+        title: "Payment Timed Out",
+        description: "Payment session expired. Please try placing your order again.",
+        variant: "destructive"
+      });
+      return;
+    }
+    const timer = setTimeout(() => {
+      setTimeLeft(timeLeft - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft, showUpiModal]);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
+
+  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setScreenshot(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setScreenshotPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const executeOrderPlacement = async () => {
+    setSubmitting(true);
+    const finalNotes = paymentMethod === "upi"
+      ? `${form.notes || ""}\n[UPI Payment Verified - App: ${selectedUpiApp?.toUpperCase()} - Screenshot uploaded]`.trim()
+      : form.notes;
+
+    createOrder.mutate(
+      {
+        data: {
+          customerName: form.name,
+          phone: form.phone,
+          items,
+          orderType: form.orderType,
+          notes: finalNotes || null,
+          tableNumber: form.orderType === "dine-in" ? (form.tableNumber || null) : null,
+          deliveryAddress: isDelivery ? form.deliveryAddress : null,
+          deliveryLandmark: isDelivery ? (form.deliveryLandmark || null) : null,
+          deliveryArea: isDelivery ? (form.deliveryArea || null) : null,
+          deliveryCharge: deliveryCharge,
+        },
+      },
+      {
+        onSuccess: (order) => {
+          const shortId = `SKT-${String(order.id).padStart(4, "0")}`;
+          clearCart();
+          setShowUpiModal(false);
+          setScreenshot(null);
+          setScreenshotPreview(null);
+          setLocation(`/track/${order.id}?new=${encodeURIComponent(shortId)}`);
+        },
+        onError: () => {
+          toast({ title: "Order failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+          setSubmitting(false);
+        },
+      }
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return;
@@ -56,35 +137,14 @@ export default function CartPage() {
       toast({ title: "UPI app required", description: "Please select a UPI app to proceed with payment.", variant: "destructive" });
       return;
     }
-    setSubmitting(true);
-    createOrder.mutate(
-      {
-        data: {
-          customerName: form.name,
-          phone: form.phone,
-          items,
-          orderType: form.orderType,
-          notes: form.notes || null,
-          tableNumber: form.orderType === "dine-in" ? (form.tableNumber || null) : null,
-          deliveryAddress: isDelivery ? form.deliveryAddress : null,
-          deliveryLandmark: isDelivery ? (form.deliveryLandmark || null) : null,
-          deliveryArea: isDelivery ? (form.deliveryArea || null) : null,
-          deliveryCharge: deliveryCharge,
-        },
-      },
-      {
-        onSuccess: (order) => {
-          const shortId = `SKT-${String(order.id).padStart(4, "0")}`;
-          clearCart();
-          // Navigate to track page WITH success popup trigger
-          setLocation(`/track/${order.id}?new=${encodeURIComponent(shortId)}`);
-        },
-        onError: () => {
-          toast({ title: "Order failed", description: "Something went wrong. Please try again.", variant: "destructive" });
-          setSubmitting(false);
-        },
-      }
-    );
+
+    if (paymentMethod === "upi") {
+      setShowUpiModal(true);
+      setTimeLeft(300);
+      return;
+    }
+
+    executeOrderPlacement();
   };
 
   if (items.length === 0) {
@@ -243,11 +303,10 @@ export default function CartPage() {
                   key={key}
                   type="button"
                   onClick={() => setForm({ ...form, orderType: key })}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all ${
-                    form.orderType === key
-                      ? "bg-primary/10 border-primary text-primary"
-                      : "bg-background border-input text-muted-foreground hover:border-primary/40"
-                  }`}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border text-center transition-all ${form.orderType === key
+                    ? "bg-primary/10 border-primary text-primary"
+                    : "bg-background border-input text-muted-foreground hover:border-primary/40"
+                    }`}
                 >
                   <Icon className="w-5 h-5" />
                   <span className="text-xs font-bold leading-tight">{label}</span>
@@ -373,11 +432,10 @@ export default function CartPage() {
                 setPaymentMethod("cash");
                 setSelectedUpiApp(null);
               }}
-              className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 text-center transition-all ${
-                paymentMethod === "cash"
-                  ? "bg-primary/10 border-primary text-foreground shadow-sm"
-                  : "bg-background border-border text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground"
-              }`}
+              className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 text-center transition-all ${paymentMethod === "cash"
+                ? "bg-primary/10 border-primary text-foreground shadow-sm"
+                : "bg-background border-border text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground"
+                }`}
             >
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${paymentMethod === "cash" ? "bg-primary/20" : "bg-muted"}`}>
                 <ShoppingBag className={`w-5 h-5 ${paymentMethod === "cash" ? "text-primary" : "text-muted-foreground"}`} />
@@ -394,11 +452,10 @@ export default function CartPage() {
               whileTap={{ scale: 0.98 }}
               type="button"
               onClick={() => setPaymentMethod("upi")}
-              className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 text-center transition-all ${
-                paymentMethod === "upi"
-                  ? "bg-primary/10 border-primary text-foreground shadow-sm"
-                  : "bg-background border-border text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground"
-              }`}
+              className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 text-center transition-all ${paymentMethod === "upi"
+                ? "bg-primary/10 border-primary text-foreground shadow-sm"
+                : "bg-background border-border text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground"
+                }`}
             >
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${paymentMethod === "upi" ? "bg-primary/20" : "bg-muted"}`}>
                 <Smartphone className={`w-5 h-5 ${paymentMethod === "upi" ? "text-primary" : "text-muted-foreground"}`} />
@@ -426,11 +483,10 @@ export default function CartPage() {
                     whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={() => setSelectedUpiApp("phonepe")}
-                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
-                      selectedUpiApp === "phonepe"
-                        ? "bg-[#5f259f]/10 border-[#5f259f] text-[#5f259f] font-bold"
-                        : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${selectedUpiApp === "phonepe"
+                      ? "bg-[#5f259f]/10 border-[#5f259f] text-[#5f259f] font-bold"
+                      : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     <div className="w-8 h-8 rounded-lg bg-[#5f259f] flex items-center justify-center text-white font-extrabold text-sm shadow-sm flex-shrink-0">
                       Pe
@@ -447,11 +503,10 @@ export default function CartPage() {
                     whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={() => setSelectedUpiApp("gpay")}
-                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
-                      selectedUpiApp === "gpay"
-                        ? "bg-[#1a73e8]/10 border-[#1a73e8] text-[#1a73e8] font-bold"
-                        : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${selectedUpiApp === "gpay"
+                      ? "bg-[#1a73e8]/10 border-[#1a73e8] text-[#1a73e8] font-bold"
+                      : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     <div className="w-8 h-8 rounded-lg bg-white border border-border flex items-center justify-center font-extrabold text-[10px] text-primary flex-shrink-0">
                       <span className="text-[#4285F4]">G</span>
@@ -471,11 +526,10 @@ export default function CartPage() {
                     whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={() => setSelectedUpiApp("paytm")}
-                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
-                      selectedUpiApp === "paytm"
-                        ? "bg-[#00baf2]/10 border-[#00baf2] text-[#00baf2] font-bold"
-                        : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${selectedUpiApp === "paytm"
+                      ? "bg-[#00baf2]/10 border-[#00baf2] text-[#00baf2] font-bold"
+                      : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     <div className="w-8 h-8 rounded-lg bg-[#00baf2] flex items-center justify-center text-white font-black text-[10px] flex-shrink-0">
                       Pay
@@ -492,11 +546,10 @@ export default function CartPage() {
                     whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={() => setSelectedUpiApp("bhim")}
-                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
-                      selectedUpiApp === "bhim"
-                        ? "bg-[#f26522]/10 border-[#f26522] text-[#f26522] font-bold"
-                        : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${selectedUpiApp === "bhim"
+                      ? "bg-[#f26522]/10 border-[#f26522] text-[#f26522] font-bold"
+                      : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     <div className="w-8 h-8 rounded-lg bg-[#f26522] flex items-center justify-center text-white font-extrabold text-[10px] flex-shrink-0">
                       UPI
@@ -531,6 +584,145 @@ export default function CartPage() {
             : `Place Order — ₹${grandTotal}`}
         </motion.button>
       </form>
+
+      {/* ── UPI Payment Modal / Overlay ── */}
+      <AnimatePresence>
+        {showUpiModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 30, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 30, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-card border border-border rounded-3xl w-full max-w-md p-6 shadow-2xl relative"
+            >
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUpiModal(false);
+                  setScreenshot(null);
+                  setScreenshotPreview(null);
+                }}
+                className="absolute right-4 top-4 p-1.5 bg-muted hover:bg-muted/80 rounded-full text-muted-foreground hover:text-foreground transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              {/* Title & Timer */}
+              <div className="text-center mb-5">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-black mb-2 tracking-wide uppercase">
+                  <Clock className="w-3.5 h-3.5 animate-pulse" />
+                  Time Left: {formatTime(timeLeft)}
+                </span>
+                <h3 className="text-xl font-black text-foreground">UPI Payment Verification</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Please scan and pay using your selected UPI app</p>
+              </div>
+
+              {/* QR Code Container */}
+              <div className="bg-background border border-border rounded-2xl p-5 mb-5 text-center flex flex-col items-center">
+                <div className="bg-white p-3 rounded-2xl shadow-inner mb-3">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+                      `upi://pay?pa=skullgamer23500@ybl&pn=Shakti%20Fast%20Food&am=${grandTotal}&cu=INR`
+                    )}`}
+                    alt="Shakti Fast Food UPI QR"
+                    className="w-44 h-44 object-contain"
+                  />
+                </div>
+                <p className="text-base font-black text-primary mb-0.5">
+                  Amount to Pay: ₹{grandTotal}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  UPI ID: <span className="font-semibold text-foreground">skullgamer23500@ybl</span>
+                </p>
+              </div>
+
+              {/* Upload Screenshot Zone */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-foreground">
+                  Upload Payment Screenshot *
+                </label>
+
+                {!screenshotPreview ? (
+                  <div className="border-2 border-dashed border-border hover:border-primary/50 rounded-2xl p-6 text-center cursor-pointer transition-all relative group bg-background/50">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleScreenshotChange}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <Upload className="w-8 h-8 text-muted-foreground group-hover:text-primary mx-auto mb-2 transition-colors" />
+                    <p className="text-xs font-bold text-foreground">Choose screenshot file</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Supports PNG, JPG, JPEG</p>
+                  </div>
+                ) : (
+                  <div className="relative border border-border rounded-2xl p-3 bg-background flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-12 h-12 rounded-lg border border-border overflow-hidden bg-muted flex-shrink-0">
+                        <img src={screenshotPreview} alt="Screenshot preview" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-foreground truncate">
+                          {screenshot?.name || "screenshot.png"}
+                        </p>
+                        <p className="text-[10px] text-green-600 font-semibold flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Ready to upload
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setScreenshot(null);
+                        setScreenshotPreview(null);
+                      }}
+                      className="p-2 hover:bg-destructive/10 rounded-xl text-muted-foreground hover:text-destructive transition-all"
+                    >
+                      <Trash className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-2 gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUpiModal(false);
+                    setScreenshot(null);
+                    setScreenshotPreview(null);
+                  }}
+                  className="bg-muted hover:bg-muted/80 text-foreground font-bold py-3.5 rounded-xl text-sm transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!screenshot || submitting || createOrder.isPending}
+                  onClick={executeOrderPlacement}
+                  className="bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-black py-3.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/25"
+                >
+                  {submitting || createOrder.isPending ? (
+                    "Processing..."
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Confirm & Pay
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
