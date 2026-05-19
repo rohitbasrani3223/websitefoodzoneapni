@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag, User, Phone, MapPin, FileText, Home, Navigation, Bike } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag, User, Phone, MapPin, FileText, Home, Navigation, Bike, Copy, Check, Star, ExternalLink, Smartphone } from "lucide-react";
 import { useCreateOrder } from "@workspace/api-client-react";
 import { useCart } from "@/context/cart";
 import { useToast } from "@/hooks/use-toast";
@@ -31,6 +31,8 @@ export default function CartPage() {
     deliveryArea: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi">("cash");
+  const [selectedUpiApp, setSelectedUpiApp] = useState<"phonepe" | "gpay" | "paytm" | "bhim" | null>(null);
   const createOrder = useCreateOrder();
 
   const isDelivery = form.orderType === "delivery";
@@ -48,6 +50,10 @@ export default function CartPage() {
     }
     if (isDelivery && !form.deliveryAddress.trim()) {
       toast({ title: "Address required", description: "Please enter your delivery address.", variant: "destructive" });
+      return;
+    }
+    if (paymentMethod === "upi" && !selectedUpiApp) {
+      toast({ title: "UPI app required", description: "Please select a UPI app to proceed with payment.", variant: "destructive" });
       return;
     }
     setSubmitting(true);
@@ -68,8 +74,10 @@ export default function CartPage() {
       },
       {
         onSuccess: (order) => {
+          const shortId = `SKT-${String(order.id).padStart(4, "0")}`;
           clearCart();
-          setLocation(`/track/${order.id}`);
+          // Navigate to track page WITH success popup trigger
+          setLocation(`/track/${order.id}?new=${encodeURIComponent(shortId)}`);
         },
         onError: () => {
           toast({ title: "Order failed", description: "Something went wrong. Please try again.", variant: "destructive" });
@@ -349,12 +357,167 @@ export default function CartPage() {
         </div>
 
         {/* Payment */}
-        <div className="bg-card border border-border rounded-2xl px-5 py-4">
-          <h2 className="font-bold text-foreground mb-1">Payment</h2>
-          <p className="text-muted-foreground text-sm">
-            {isDelivery ? "Cash on delivery. Pay when your order arrives." : "Pay at counter — Cash or UPI accepted."}
-          </p>
+        <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
+          <div>
+            <h2 className="font-bold text-foreground mb-1 text-base">Payment Method</h2>
+            <p className="text-muted-foreground text-xs">Aap kaise pay karna chahenge?</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {/* Cash on Delivery / Counter */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="button"
+              onClick={() => {
+                setPaymentMethod("cash");
+                setSelectedUpiApp(null);
+              }}
+              className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 text-center transition-all ${
+                paymentMethod === "cash"
+                  ? "bg-primary/10 border-primary text-foreground shadow-sm"
+                  : "bg-background border-border text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground"
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${paymentMethod === "cash" ? "bg-primary/20" : "bg-muted"}`}>
+                <ShoppingBag className={`w-5 h-5 ${paymentMethod === "cash" ? "text-primary" : "text-muted-foreground"}`} />
+              </div>
+              <div>
+                <p className="text-sm font-bold">{isDelivery ? "Cash on Delivery" : "Pay at Counter"}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">{isDelivery ? "Pay when order arrives" : "Cash / UPI at stall"}</p>
+              </div>
+            </motion.button>
+
+            {/* UPI Option */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              type="button"
+              onClick={() => setPaymentMethod("upi")}
+              className={`p-4 rounded-xl border flex flex-col items-center justify-center gap-2 text-center transition-all ${
+                paymentMethod === "upi"
+                  ? "bg-primary/10 border-primary text-foreground shadow-sm"
+                  : "bg-background border-border text-muted-foreground hover:border-muted-foreground/30 hover:text-foreground"
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${paymentMethod === "upi" ? "bg-primary/20" : "bg-muted"}`}>
+                <Smartphone className={`w-5 h-5 ${paymentMethod === "upi" ? "text-primary" : "text-muted-foreground"}`} />
+              </div>
+              <div>
+                <p className="text-sm font-bold">UPI / Instant Pay</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Pay via GPay, PhonePe, etc.</p>
+              </div>
+            </motion.button>
+          </div>
+
+          <AnimatePresence>
+            {paymentMethod === "upi" && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="space-y-3 pt-2 overflow-hidden"
+              >
+                <p className="text-xs text-foreground font-semibold">Select your UPI App:</p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* PhonePe */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => setSelectedUpiApp("phonepe")}
+                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                      selectedUpiApp === "phonepe"
+                        ? "bg-[#5f259f]/10 border-[#5f259f] text-[#5f259f] font-bold"
+                        : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-[#5f259f] flex items-center justify-center text-white font-extrabold text-sm shadow-sm flex-shrink-0">
+                      Pe
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-bold text-foreground">PhonePe</p>
+                      <p className="text-[9px] text-muted-foreground">Fastest checkout</p>
+                    </div>
+                  </motion.button>
+
+                  {/* Google Pay */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => setSelectedUpiApp("gpay")}
+                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                      selectedUpiApp === "gpay"
+                        ? "bg-[#1a73e8]/10 border-[#1a73e8] text-[#1a73e8] font-bold"
+                        : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-white border border-border flex items-center justify-center font-extrabold text-[10px] text-primary flex-shrink-0">
+                      <span className="text-[#4285F4]">G</span>
+                      <span className="text-[#EA4335]">P</span>
+                      <span className="text-[#FBBC05]">a</span>
+                      <span className="text-[#34A853]">y</span>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-bold text-foreground">Google Pay</p>
+                      <p className="text-[9px] text-muted-foreground">Secure with Google</p>
+                    </div>
+                  </motion.button>
+
+                  {/* Paytm */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => setSelectedUpiApp("paytm")}
+                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                      selectedUpiApp === "paytm"
+                        ? "bg-[#00baf2]/10 border-[#00baf2] text-[#00baf2] font-bold"
+                        : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-[#00baf2] flex items-center justify-center text-white font-black text-[10px] flex-shrink-0">
+                      Pay
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-bold text-foreground">Paytm</p>
+                      <p className="text-[9px] text-muted-foreground">Instant wallet/UPI</p>
+                    </div>
+                  </motion.button>
+
+                  {/* BHIM UPI */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => setSelectedUpiApp("bhim")}
+                    className={`p-3 rounded-xl border flex items-center gap-3 transition-all ${
+                      selectedUpiApp === "bhim"
+                        ? "bg-[#f26522]/10 border-[#f26522] text-[#f26522] font-bold"
+                        : "bg-background border-border hover:border-muted-foreground/20 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-[#f26522] flex items-center justify-center text-white font-extrabold text-[10px] flex-shrink-0">
+                      UPI
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs font-bold text-foreground">BHIM UPI</p>
+                      <p className="text-[9px] text-muted-foreground">Govt. secure UPI</p>
+                    </div>
+                  </motion.button>
+                </div>
+
+                <div className="mt-2 p-3 bg-muted/40 rounded-xl border border-border/60">
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    💡 <span className="font-semibold text-foreground">Note:</span> Order place karne ke baad aapko select kiye gaye UPI app par request aayegi, ya fir counter par scan karke pay kar sakte hain.
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+
 
         <motion.button
           whileHover={{ scale: 1.02 }}

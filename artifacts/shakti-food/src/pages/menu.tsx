@@ -1,9 +1,18 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingBag, Plus, Minus, X, Star, Filter } from "lucide-react";
+import { Search, ShoppingBag, Plus, Minus, Star, Filter } from "lucide-react";
 import { useListMenuItems, useListCategories, getListMenuItemsQueryKey } from "@workspace/api-client-react";
 import { useCart } from "@/context/cart";
+
+/* Reusable fade+rise entrance */
+const fadeUp = {
+  hidden: { opacity: 0, y: 28, filter: "blur(6px)" },
+  show: (i: number) => ({
+    opacity: 1, y: 0, filter: "blur(0px)",
+    transition: { duration: 0.5, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] },
+  }),
+};
 
 export default function MenuPage() {
   const [, setLocation] = useLocation();
@@ -19,6 +28,7 @@ export default function MenuPage() {
   );
 
   const filtered = useMemo(() => {
+    if (!Array.isArray(menuItems)) return [];
     return menuItems.filter((item) => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
@@ -31,24 +41,31 @@ export default function MenuPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+      {/* ── Sticky Header ── */}
+      <motion.div
+        initial={{ y: -60, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border"
+      >
         <div className="max-w-6xl mx-auto px-4 py-3">
           <div className="flex items-center gap-3 mb-3">
-            <button onClick={() => setLocation("/")} className="text-muted-foreground hover:text-foreground transition-colors text-sm">
-              Shakti Fast Food
+            <button onClick={() => setLocation("/")} className="flex items-center hover:opacity-80 transition-opacity">
+              <img src="/logo.png" alt="Shakti Fast Food" className="h-8 w-auto" />
             </button>
-            <span className="text-muted-foreground">/</span>
-            <span className="text-foreground font-semibold text-sm">Menu</span>
+            <span className="text-muted-foreground ml-2">/</span>
+            <span className="text-foreground font-semibold text-sm ml-2">Menu</span>
             <div className="ml-auto flex items-center gap-2">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 onClick={() => setShowVegOnly(!showVegOnly)}
                 data-testid="button-veg-filter"
                 className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-all ${showVegOnly ? "bg-green-600 border-green-600 text-white" : "bg-card border-border text-muted-foreground hover:border-green-500/50"}`}
               >
                 <div className="w-2.5 h-2.5 rounded-full border-2 border-current" />
                 Veg Only
-              </button>
+              </motion.button>
             </div>
           </div>
 
@@ -66,30 +83,42 @@ export default function MenuPage() {
           </div>
 
           {/* Categories */}
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-            <button
+          <motion.div
+            className="flex gap-2 overflow-x-auto scrollbar-hide pb-1"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => setSelectedCategory("all")}
               data-testid="category-all"
-              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${selectedCategory === "all" ? "bg-primary text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:border-primary/40"}`}
+              className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${selectedCategory === "all" ? "bg-primary text-primary-foreground shadow-[0_0_12px_rgba(255,122,0,0.4)]" : "bg-card border border-border text-muted-foreground hover:border-primary/40"}`}
             >
               All Items
-            </button>
-            {categories.map((cat) => (
-              <button
+            </motion.button>
+            {Array.isArray(categories) && categories.map((cat, ci) => (
+              <motion.button
                 key={cat.id}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, delay: 0.05 * ci }}
                 onClick={() => setSelectedCategory(cat.slug)}
                 data-testid={`category-${cat.slug}`}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${selectedCategory === cat.slug ? "bg-primary text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:border-primary/40"}`}
+                className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${selectedCategory === cat.slug ? "bg-primary text-primary-foreground shadow-[0_0_12px_rgba(255,122,0,0.4)]" : "bg-card border border-border text-muted-foreground hover:border-primary/40"}`}
               >
                 {cat.name}
                 <span className="text-xs opacity-70">({cat.itemCount})</span>
-              </button>
+              </motion.button>
             ))}
-          </div>
+          </motion.div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Menu Grid */}
+      {/* ── Menu Grid ── */}
       <div className="max-w-6xl mx-auto px-4 py-6">
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -102,87 +131,118 @@ export default function MenuPage() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-muted-foreground">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-20 text-muted-foreground"
+          >
             <Filter className="w-12 h-12 mx-auto mb-3 opacity-30" />
             <p className="text-lg font-semibold">No items found</p>
             <p className="text-sm mt-1">Try a different search or category</p>
-          </div>
+          </motion.div>
         ) : (
-          <motion.div
-            layout
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          >
+          <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <AnimatePresence>
-              {filtered.map((dish) => {
+              {filtered.map((dish, i) => {
                 const cartItem = getCartItem(dish.id);
                 return (
                   <motion.div
                     key={dish.id}
                     layout
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
+                    custom={i}
+                    variants={fadeUp}
+                    initial="hidden"
+                    animate="show"
+                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                    whileHover={{ y: -4, boxShadow: "0 12px 40px rgba(255,122,0,0.12)" }}
                     data-testid={`card-menu-${dish.id}`}
-                    className={`bg-card border rounded-2xl p-5 transition-all duration-200 ${dish.available ? "border-card-border hover:border-primary/30" : "border-card-border opacity-60"}`}
+                    className={`group relative bg-card border rounded-2xl p-5 transition-colors duration-200 cursor-default overflow-hidden ${dish.available ? "border-border hover:border-primary/40" : "border-border opacity-60"}`}
                   >
-                    <div className="flex items-start gap-3 mb-3">
-                      <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 ${dish.isVeg ? "border-green-500 bg-green-500/20" : "border-red-500 bg-red-500/20"}`} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-bold text-foreground text-sm leading-tight">{dish.name}</h3>
-                          {dish.isFeatured && (
-                            <span className="flex-shrink-0 bg-primary/15 text-primary text-xs font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                              <Star className="w-2.5 h-2.5 fill-primary" /> Hot
-                            </span>
+                    {/* Shimmer bottom line */}
+                    <motion.div
+                      className="absolute bottom-0 left-0 h-[2px] bg-gradient-to-r from-primary to-primary/40 rounded-b-2xl"
+                      initial={{ width: "0%" }}
+                      whileHover={{ width: "100%" }}
+                      transition={{ duration: 0.35 }}
+                    />
+
+                    {/* Hover glow */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:to-transparent transition-all duration-500 rounded-2xl pointer-events-none" />
+
+                    <div className="relative z-10">
+                      <div className="flex items-start gap-3 mb-3">
+                        <div className={`w-4 h-4 rounded-full border-2 flex-shrink-0 mt-0.5 ${dish.isVeg ? "border-green-500 bg-green-500/20" : "border-red-500 bg-red-500/20"}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="font-bold text-foreground text-sm leading-tight group-hover:text-primary transition-colors duration-200">{dish.name}</h3>
+                            {dish.isFeatured && (
+                              <motion.span
+                                animate={{ scale: [1, 1.1, 1] }}
+                                transition={{ repeat: Infinity, duration: 2 }}
+                                className="flex-shrink-0 bg-primary/15 text-primary text-xs font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-0.5"
+                              >
+                                <Star className="w-2.5 h-2.5 fill-primary" /> Hot
+                              </motion.span>
+                            )}
+                          </div>
+                          {dish.description && (
+                            <p className="text-muted-foreground text-xs mt-0.5 line-clamp-2">{dish.description}</p>
                           )}
                         </div>
-                        {dish.description && (
-                          <p className="text-muted-foreground text-xs mt-0.5 line-clamp-2">{dish.description}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between mt-auto">
-                      <div>
-                        <span className="text-primary font-black text-lg">₹{dish.price}</span>
-                        {dish.halfPrice && (
-                          <span className="text-muted-foreground text-xs ml-1">/ ₹{dish.halfPrice} half</span>
-                        )}
-                        {!dish.available && (
-                          <span className="ml-2 text-destructive text-xs font-medium">Unavailable</span>
-                        )}
                       </div>
 
-                      {dish.available && (
-                        cartItem ? (
-                          <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-2 py-1">
-                            <button
-                              onClick={() => updateQuantity(dish.id, cartItem.quantity - 1)}
-                              data-testid={`button-decrease-${dish.id}`}
-                              className="w-6 h-6 rounded-lg bg-primary/20 hover:bg-primary/40 flex items-center justify-center transition-colors"
-                            >
-                              <Minus className="w-3 h-3 text-primary" />
-                            </button>
-                            <span className="text-foreground font-bold text-sm w-4 text-center">{cartItem.quantity}</span>
-                            <button
-                              onClick={() => updateQuantity(dish.id, cartItem.quantity + 1)}
-                              data-testid={`button-increase-${dish.id}`}
-                              className="w-6 h-6 rounded-lg bg-primary/20 hover:bg-primary/40 flex items-center justify-center transition-colors"
-                            >
-                              <Plus className="w-3 h-3 text-primary" />
-                            </button>
-                          </div>
-                        ) : (
-                          <motion.button
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => addItem({ menuItemId: dish.id, name: dish.name, price: dish.price })}
-                            data-testid={`button-add-${dish.id}`}
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground w-8 h-8 rounded-xl flex items-center justify-center transition-colors shadow-sm"
+                      <div className="flex items-center justify-between mt-auto">
+                        <div>
+                          <motion.span
+                            className="text-primary font-black text-lg"
+                            whileHover={{ scale: 1.08 }}
                           >
-                            <Plus className="w-4 h-4" />
-                          </motion.button>
-                        )
-                      )}
+                            ₹{dish.price}
+                          </motion.span>
+                          {dish.halfPrice && (
+                            <span className="text-muted-foreground text-xs ml-1">/ ₹{dish.halfPrice} half</span>
+                          )}
+                          {!dish.available && (
+                            <span className="ml-2 text-destructive text-xs font-medium">Unavailable</span>
+                          )}
+                        </div>
+
+                        {dish.available && (
+                          cartItem ? (
+                            <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-xl px-2 py-1">
+                              <motion.button
+                                whileTap={{ scale: 0.85 }}
+                                whileHover={{ scale: 1.1 }}
+                                onClick={() => updateQuantity(dish.id, cartItem.quantity - 1)}
+                                data-testid={`button-decrease-${dish.id}`}
+                                className="w-6 h-6 rounded-lg bg-primary/20 hover:bg-primary/40 flex items-center justify-center transition-colors"
+                              >
+                                <Minus className="w-3 h-3 text-primary" />
+                              </motion.button>
+                              <span className="text-foreground font-bold text-sm w-4 text-center">{cartItem.quantity}</span>
+                              <motion.button
+                                whileTap={{ scale: 0.85 }}
+                                whileHover={{ scale: 1.1 }}
+                                onClick={() => updateQuantity(dish.id, cartItem.quantity + 1)}
+                                data-testid={`button-increase-${dish.id}`}
+                                className="w-6 h-6 rounded-lg bg-primary/20 hover:bg-primary/40 flex items-center justify-center transition-colors"
+                              >
+                                <Plus className="w-3 h-3 text-primary" />
+                              </motion.button>
+                            </div>
+                          ) : (
+                            <motion.button
+                              whileTap={{ scale: 0.85 }}
+                              whileHover={{ scale: 1.15, boxShadow: "0 0 16px rgba(255,122,0,0.5)" }}
+                              onClick={() => addItem({ menuItemId: dish.id, name: dish.name, price: dish.price })}
+                              data-testid={`button-add-${dish.id}`}
+                              className="bg-primary hover:bg-primary/90 text-primary-foreground w-8 h-8 rounded-xl flex items-center justify-center transition-colors shadow-sm"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </motion.button>
+                          )
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 );
@@ -192,26 +252,29 @@ export default function MenuPage() {
         )}
       </div>
 
-      {/* Floating Cart */}
+      {/* ── Floating Cart ── */}
       <AnimatePresence>
         {itemCount > 0 && (
           <motion.div
-            initial={{ y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 100, opacity: 0 }}
+            initial={{ y: 100, opacity: 0, scale: 0.9 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 100, opacity: 0, scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 300, damping: 28 }}
             className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm"
           >
-            <button
+            <motion.button
+              whileHover={{ scale: 1.03, boxShadow: "0 0 30px rgba(255,122,0,0.4)" }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => setLocation("/cart")}
               data-testid="button-view-cart"
-              className="w-full bg-primary text-primary-foreground font-bold py-4 px-6 rounded-2xl flex items-center justify-between glow-box shadow-xl transition-all hover:bg-primary/90"
+              className="w-full bg-primary text-primary-foreground font-bold py-4 px-6 rounded-2xl flex items-center justify-between glow-box shadow-xl transition-all"
             >
               <span className="bg-primary-foreground/20 rounded-lg px-2 py-0.5 text-sm">{itemCount} items</span>
               <span className="flex items-center gap-2">
                 View Cart <ShoppingBag className="w-4 h-4" />
               </span>
               <span className="font-black">₹{total}</span>
-            </button>
+            </motion.button>
           </motion.div>
         )}
       </AnimatePresence>

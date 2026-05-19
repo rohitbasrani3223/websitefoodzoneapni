@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   motion,
@@ -11,8 +11,8 @@ import {
 } from "framer-motion";
 import { ShoppingBag, MapPin, Phone, Train, ArrowDown, Zap, Navigation } from "lucide-react";
 import { useGetPopularItems } from "@workspace/api-client-react";
-import shopPhoto from "@assets/2026-05-17-04-51-51-693_1778975204279.jpg";
-import menuBoard from "@assets/file_000000002cf0720b95a55042a8678f86_1778975194898.png";
+const shopPhoto = "/photos/shop-night.png";
+const menuBoard = "/photos/chai-snacks.png";
 
 /* ── Word-by-word blur-in reveal ───────────────────────── */
 function SplitReveal({ text, className }: { text: string; className?: string }) {
@@ -73,158 +73,112 @@ function TiltCard({
     </motion.div>
   );
 }
-
-/* ── Scroll chapter slide (proper component — no hook-in-loop) ── */
 const CHAPTERS = [
-  { tag: "Morning Ritual",  headline: "Start your day\nwith Masala\nChai.",      sub: "₹5 · Spiced to perfection",        watermark: "CHAI",     accent: "#f59e0b", orb: "#78350f" },
-  { tag: "Comfort Food",    headline: "Cheese Maggi\nthat hits\ndifferent.",      sub: "₹70 · Creamy, loaded, fresh",      watermark: "MAGGI",    accent: "#ff7a00", orb: "#7c2d12" },
-  { tag: "Street Classic",  headline: "Momos so good\nyou'll miss\nyour train.",  sub: "₹60 / ₹110 · Steam or fried",     watermark: "MOMOS",    accent: "#ef4444", orb: "#450a0a" },
-  { tag: "Quick Bite",      headline: "Sandwiches\nbuilt for\nhungry people.",    sub: "₹40–₹120 · 8 varieties",          watermark: "SANDWICH", accent: "#eab308", orb: "#422006" },
+  { tag: "Morning Ritual",  headline: "Start your day\nwith Masala Chai.",       sub: "₹15 · Spiced to perfection",  watermark: "CHAI",     accent: "#f59e0b", orb: "#78350f", image: "/photos/1.png",             dir: "left"  },
+  { tag: "Comfort Food",    headline: "Cheese Maggi\nthat hits different.",       sub: "₹70 · Creamy, loaded, fresh", watermark: "MAGGI",    accent: "#ff7a00", orb: "#7c2d12", image: "/photos/maggi.png",         dir: "right" },
+  { tag: "Street Classic",  headline: "Momos so good\nyou will miss your train.",  sub: "₹60/₹110 · Steam or fried",  watermark: "MOMOS",    accent: "#ef4444", orb: "#450a0a", image: "/photos/momos.png",         dir: "left"  },
+  { tag: "Quick Bite",      headline: "Sandwiches built\nfor hungry people.",    sub: "₹40–₹120 · 8 varieties",     watermark: "SANDWICH", accent: "#eab308", orb: "#422006", image: "/photos/sandwich-fries.png", dir: "right" },
 ] as const;
 type Chapter = typeof CHAPTERS[number];
 
-function ChapterSlide({
-  ch, i, total, smooth,
-}: {
-  ch: Chapter; i: number; total: number; smooth: MotionValue<number>;
-}) {
-  const start = i / total;
-  const end = (i + 1) / total;
-  const overlap = 0.07;
+function OneChapter({ ch, idx }: { ch: Chapter; idx: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+  const [entered, setEntered] = useState(false);
 
-  const opacity = useTransform(
-    smooth,
-    [Math.max(0, start - overlap), start + 0.04, end - 0.04, Math.min(1, end + overlap * 0.5)],
-    [0, 1, 1, 0],
-  );
-  const y = useTransform(smooth, [start, end], ["36px", "-36px"]);
-  const scale = useTransform(smooth, [start, start + 0.08, end - 0.08, end], [0.94, 1, 1, 0.94]);
-  const orbScale = useTransform(smooth, [start, start + 0.15, end - 0.15, end], [0.6, 1, 1, 0.6]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setEntered(true); },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const imgY = useTransform(scrollYProgress, [0, 1], ["-6%", "6%"]);
 
   return (
-    <motion.div
-      style={{ opacity }}
-      className="absolute inset-0 flex items-center overflow-hidden"
-    >
-      {/* Watermark food name */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
-        <span
-          className="text-[22vw] sm:text-[18vw] font-black leading-none tracking-tighter"
-          style={{ color: ch.accent, opacity: 0.06 }}
-        >
-          {ch.watermark}
-        </span>
-      </div>
-
-      {/* Decorative orb */}
-      <motion.div
-        style={{ scale: orbScale, background: ch.orb, opacity: 0.5 }}
-        className="absolute -right-20 top-1/2 -translate-y-1/2 w-80 h-80 rounded-full blur-[100px] pointer-events-none"
-      />
-
-      {/* Main content */}
-      <motion.div
-        style={{ y, scale }}
-        className="relative z-10 px-8 md:px-20 max-w-5xl"
-      >
-        {/* Tag badge */}
-        <motion.span
-          initial={false}
-          className="inline-flex items-center text-[11px] font-black tracking-[0.25em] uppercase mb-5 px-3 py-1.5 rounded-full border"
-          style={{ color: ch.accent, borderColor: ch.accent + "44", background: ch.accent + "18" }}
-        >
-          {ch.tag}
-        </motion.span>
-
-        {/* Headline */}
-        <h2
-          className="text-[13vw] sm:text-[10vw] md:text-[8vw] font-black text-foreground leading-[1] tracking-tight mb-6 whitespace-pre-line"
-        >
-          {ch.headline}
-        </h2>
-
-        {/* Sub + price badge */}
-        <div className="flex items-center gap-4 flex-wrap">
-          <span
-            className="text-lg md:text-2xl font-bold"
-            style={{ color: ch.accent }}
-          >
-            {ch.sub}
-          </span>
-          <motion.div
-            animate={{ rotate: [-3, 3, -3] }}
-            transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-            className="px-3 py-1 rounded-full text-xs font-black"
-            style={{ background: ch.accent + "22", color: ch.accent, border: `1px solid ${ch.accent}44` }}
-          >
-            Order now
-          </motion.div>
+    <div ref={ref} className="relative" style={{ height: "100vh" }}>
+      <div className="sticky top-0 h-screen overflow-hidden bg-background flex items-center">
+        {/* Watermark */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+          <span className="text-[22vw] font-black leading-none tracking-tighter" style={{ color: ch.accent, opacity: 0.06 }}>{ch.watermark}</span>
         </div>
-      </motion.div>
+        {/* Orb */}
+        <div className={`absolute top-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-[130px] pointer-events-none ${ch.dir === "left" ? "-right-40" : "-left-40"}`} style={{ background: ch.orb, opacity: 0.35 }} />
 
-      {/* Chapter number */}
-      <div className="absolute bottom-8 right-8 text-right pointer-events-none">
-        <span className="text-[8rem] font-black leading-none" style={{ color: ch.accent, opacity: 0.05 }}>
-          0{i + 1}
-        </span>
-      </div>
-
-      {/* Floating decorative dots */}
-      {[...Array(4)].map((_, d) => (
+        {/* Food photo — parallax */}
         <motion.div
-          key={d}
-          className="absolute rounded-full pointer-events-none"
-          style={{
-            width: 6 + d * 4,
-            height: 6 + d * 4,
-            background: ch.accent,
-            opacity: 0.15 + d * 0.05,
-            left: `${15 + d * 20}%`,
-            top: `${20 + d * 18}%`,
-          }}
-          animate={{ y: [0, -12, 0], x: [0, 6, 0] }}
-          transition={{ repeat: Infinity, duration: 3 + d, delay: d * 0.5, ease: "easeInOut" }}
-        />
-      ))}
-    </motion.div>
-  );
-}
+          className={`absolute top-1/2 -translate-y-1/2 w-[50vw] max-w-[420px] pointer-events-none ${ch.dir === "left" ? "right-4 md:right-16" : "left-4 md:left-16"}`}
+          style={{ y: imgY }}
+          initial={{ x: ch.dir === "left" ? 120 : -120, opacity: 0 }}
+          animate={entered ? { x: 0, opacity: 1 } : {}}
+          transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <img src={ch.image} alt={ch.watermark} className="w-full h-auto object-contain drop-shadow-2xl" />
+        </motion.div>
 
-/* ── Sticky scroll chapter wrapper ─────────────────────── */
-function ScrollChapters() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ["start start", "end end"],
-  });
-  const smooth = useSpring(scrollYProgress, { stiffness: 55, damping: 22 });
+        {/* Text */}
+        <motion.div
+          className={`relative z-10 px-8 md:px-20 max-w-xl ${ch.dir === "right" ? "ml-auto" : ""}`}
+          initial={{ x: ch.dir === "left" ? -80 : 80, opacity: 0 }}
+          animate={entered ? { x: 0, opacity: 1 } : {}}
+          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <motion.span
+            className="inline-flex items-center text-[11px] font-black tracking-[0.25em] uppercase mb-5 px-3 py-1.5 rounded-full border"
+            style={{ color: ch.accent, borderColor: ch.accent + "44", background: ch.accent + "18" }}
+          >
+            {ch.tag}
+          </motion.span>
+          <h2 className="text-[12vw] sm:text-[9vw] md:text-[7vw] font-black text-foreground leading-[1.05] tracking-tight mb-6 whitespace-pre-line">
+            {ch.headline}
+          </h2>
+          <div className="flex items-center gap-4 flex-wrap">
+            <span className="text-lg md:text-2xl font-bold" style={{ color: ch.accent }}>{ch.sub}</span>
+            <motion.span
+              animate={{ rotate: [-3, 3, -3] }}
+              transition={{ repeat: Infinity, duration: 3 }}
+              className="px-3 py-1 rounded-full text-xs font-black cursor-pointer"
+              style={{ background: ch.accent + "22", color: ch.accent, border: `1px solid ${ch.accent}44` }}
+            >
+              Order now
+            </motion.span>
+          </div>
+        </motion.div>
 
-  return (
-    <div ref={containerRef} style={{ height: `${CHAPTERS.length * 100}vh` }} className="relative">
-      <div className="sticky top-0 h-screen overflow-hidden bg-background">
-        {CHAPTERS.map((ch, i) => (
-          <ChapterSlide key={ch.watermark} ch={ch} i={i} total={CHAPTERS.length} smooth={smooth} />
-        ))}
-
-        {/* Progress dots */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2">
-          {CHAPTERS.map((ch, i) => {
-            const start = i / CHAPTERS.length;
-            const end = (i + 1) / CHAPTERS.length;
-            const dotOpacity = useTransform(smooth, [start, start + 0.08, end - 0.08, end], [0.25, 1, 1, 0.25]);
-            return (
-              <motion.div
-                key={i}
-                style={{ opacity: dotOpacity, background: ch.accent }}
-                className="w-1.5 h-1.5 rounded-full"
-              />
-            );
-          })}
+        {/* Chapter number watermark */}
+        <div className="absolute bottom-6 right-6 pointer-events-none">
+          <span className="text-[7rem] font-black leading-none" style={{ color: ch.accent, opacity: 0.04 }}>0{idx + 1}</span>
         </div>
+
+        {/* Floating dots */}
+        {[...Array(3)].map((_, d) => (
+          <motion.div
+            key={d}
+            className="absolute rounded-full pointer-events-none"
+            style={{ width: 8 + d * 5, height: 8 + d * 5, background: ch.accent, opacity: 0.1 + d * 0.05, left: `${20 + d * 22}%`, top: `${25 + d * 20}%` }}
+            animate={{ y: [0, -14, 0] }}
+            transition={{ repeat: Infinity, duration: 4 + d, delay: d * 0.6, ease: "easeInOut" }}
+          />
+        ))}
       </div>
     </div>
   );
 }
+
+function ScrollChapters() {
+  return (
+    <div>
+      {CHAPTERS.map((ch, i) => (
+        <OneChapter key={ch.watermark} ch={ch} idx={i} />
+      ))}
+    </div>
+  );
+}
+
 
 /* ── Horizontal food ticker ────────────────────────────── */
 const TICKER_ITEMS = [
@@ -268,9 +222,9 @@ export default function Home() {
   /* hero parallax */
   const heroRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress: heroScroll } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const heroImgY   = useTransform(heroScroll, [0, 1], ["0%", "28%"]);
+  const heroImgY = useTransform(heroScroll, [0, 1], ["0%", "28%"]);
   const heroOpacity = useTransform(heroScroll, [0, 0.65], [1, 0]);
-  const heroScale  = useTransform(heroScroll, [0, 1], [1, 1.1]);
+  const heroScale = useTransform(heroScroll, [0, 1], [1, 1.1]);
 
   /* shop photo parallax */
   const shopRef = useRef<HTMLDivElement>(null);
@@ -278,11 +232,11 @@ export default function Home() {
 
   /* floating hero food pills */
   const PILLS = [
-    { label: "Masala Chai ₹5",   x: "12%",  delay: 0 },
-    { label: "Cheese Maggi ₹70", x: "72%",  delay: 0.4 },
-    { label: "Momos ₹60",        x: "35%",  delay: 0.8 },
-    { label: "Sandwich ₹80",     x: "58%",  delay: 1.1 },
-    { label: "Fries ₹50",        x: "20%",  delay: 1.5 },
+    { label: "Masala Chai ₹5", x: "12%", delay: 0 },
+    { label: "Cheese Maggi ₹70", x: "72%", delay: 0.4 },
+    { label: "Momos ₹60", x: "35%", delay: 0.8 },
+    { label: "Sandwich ₹80", x: "58%", delay: 1.1 },
+    { label: "Fries ₹50", x: "20%", delay: 1.5 },
   ];
 
   return (
@@ -332,6 +286,17 @@ export default function Home() {
             Railway Station Favorite — Sagar, MP
           </motion.div>
 
+          <div className="overflow-hidden flex justify-center mb-6">
+            <motion.img
+              initial={{ y: 60, opacity: 0, scale: 0.8, rotate: -10 }}
+              animate={{ y: 0, opacity: 1, scale: 1, rotate: 0 }}
+              transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
+              src="/logo.png"
+              alt="Shakti Fast Food Logo"
+              className="w-32 h-32 sm:w-48 sm:h-48 md:w-56 md:h-56 object-contain drop-shadow-[0_0_20px_rgba(255,122,0,0.3)]"
+            />
+          </div>
+
           <div className="overflow-hidden">
             <motion.h1
               initial={{ y: "110%", opacity: 0 }}
@@ -363,6 +328,18 @@ export default function Home() {
           </motion.p>
 
           <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className="mb-8 inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1.5"
+          >
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-sm font-semibold text-white/90">
+              <span className="text-green-400 font-bold">42+</span> orders placed today
+            </span>
+          </motion.div>
+
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.65 }}
@@ -380,11 +357,20 @@ export default function Home() {
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.97 }}
-              onClick={() => document.getElementById("location")?.scrollIntoView({ behavior: "smooth" })}
+              onClick={() => setLocation("/track")}
               className="flex items-center gap-2.5 bg-white/5 backdrop-blur-sm border border-white/15 hover:border-primary/50 text-foreground font-semibold px-9 py-4 rounded-xl text-lg transition-all"
             >
+              <Navigation className="w-5 h-5 text-primary" />
+              Track Order
+            </motion.button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => document.getElementById("location")?.scrollIntoView({ behavior: "smooth" })}
+              className="flex items-center gap-2.5 bg-white/5 backdrop-blur-sm border border-white/15 hover:border-primary/50 text-foreground font-semibold px-7 py-4 rounded-xl text-lg transition-all"
+            >
               <MapPin className="w-5 h-5 text-primary" />
-              View Location
+              Location
             </motion.button>
           </motion.div>
         </motion.div>
@@ -496,7 +482,7 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {popularItems.slice(0, 8).map((dish, i) => (
+              {Array.isArray(popularItems) && popularItems.slice(0, 8).map((dish, i) => (
                 <motion.div
                   key={dish.id}
                   initial={{ opacity: 0, y: 50, filter: "blur(8px)" }}
@@ -514,9 +500,8 @@ export default function Home() {
                     <div className="relative z-10 h-full flex flex-col">
                       <div className="flex items-center justify-between mb-4">
                         <span
-                          className={`w-3.5 h-3.5 rounded-full border-2 ${
-                            dish.isVeg ? "border-green-500 bg-green-500/20" : "border-red-500 bg-red-500/20"
-                          }`}
+                          className={`w-3.5 h-3.5 rounded-full border-2 ${dish.isVeg ? "border-green-500 bg-green-500/20" : "border-red-500 bg-red-500/20"
+                            }`}
                         />
                         {dish.isFeatured && (
                           <motion.span

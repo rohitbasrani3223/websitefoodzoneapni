@@ -242,6 +242,15 @@ export default function AdminDashboard() {
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${STATUS_COLORS[order.status as OrderStatus] ?? ""}`}>
                             {order.status === "out-for-delivery" ? "Out for Delivery" : order.status}
                           </span>
+                          {order.status !== "completed" && order.status !== "cancelled" && (
+                            <button
+                              onClick={() => handleStatusChange(order.id, "cancelled")}
+                              data-testid={`button-cancel-${order.id}`}
+                              className="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-destructive/70 hover:text-destructive transition-colors ml-auto"
+                            >
+                              <X className="w-3 h-3" /> Cancel Order
+                            </button>
+                          )}
                         </div>
                       </div>
 
