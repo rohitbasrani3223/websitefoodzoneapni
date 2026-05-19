@@ -9,6 +9,8 @@ import CartPage from "@/pages/cart";
 import TrackPage from "@/pages/track";
 import AdminLoginPage from "@/pages/admin-login";
 import AdminDashboard from "@/pages/admin-dashboard";
+import CustomerLoginPage from "@/pages/login";
+import CustomerSignupPage from "@/pages/signup";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -28,6 +30,8 @@ function Router() {
       <Route path="/cart" component={CartPage} />
       <Route path="/track" component={TrackPage} />
       <Route path="/track/:id" component={TrackPage} />
+      <Route path="/login" component={CustomerLoginPage} />
+      <Route path="/signup" component={CustomerSignupPage} />
       <Route path="/admin" component={AdminLoginPage} />
       <Route path="/admin/dashboard" component={AdminDashboard} />
       <Route component={NotFound} />
