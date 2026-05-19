@@ -8,8 +8,9 @@ import {
   useInView,
   useMotionValue,
   MotionValue,
+  AnimatePresence,
 } from "framer-motion";
-import { ShoppingBag, MapPin, Phone, Train, ArrowDown, Zap, Navigation } from "lucide-react";
+import { ShoppingBag, MapPin, Phone, Train, ArrowDown, Zap, Navigation, X, UserPlus, LogIn, User, LogOut, ChevronDown } from "lucide-react";
 import { useGetPopularItems } from "@workspace/api-client-react";
 const shopPhoto = "/photos/shop-night.png";
 const menuBoard = "/photos/chai-snacks.png";
@@ -218,6 +219,22 @@ function useParallax(ref: React.RefObject<HTMLElement | null>, range: [string, s
 export default function Home() {
   const [, setLocation] = useLocation();
   const { data: popularItems = [] } = useGetPopularItems();
+  const [loggedInUser, setLoggedInUser] = useState<{ name: string; email: string } | null>(null);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+
+  useEffect(() => {
+    const userStr = localStorage.getItem("customer-user");
+    if (userStr) {
+      try { setLoggedInUser(JSON.parse(userStr)); } catch { /* ignore */ }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("customer-token");
+    localStorage.removeItem("customer-user");
+    setLoggedInUser(null);
+    setShowProfileMenu(false);
+  };
 
   /* hero parallax */
   const heroRef = useRef<HTMLDivElement>(null);
@@ -247,6 +264,67 @@ export default function Home() {
         ref={heroRef}
         className="relative h-screen flex flex-col items-center justify-center overflow-hidden"
       >
+        {/* TOP NAVBAR (Login / Sign Up / Profile) */}
+        <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-end p-6 sm:px-10 pointer-events-auto">
+          {loggedInUser ? (
+            <div className="relative">
+              <button
+                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                className="flex items-center gap-2 bg-background/30 backdrop-blur-md border border-border/50 rounded-full px-3 py-2 hover:border-primary/50 transition-all"
+              >
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-black text-sm">
+                  {loggedInUser.name.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-sm font-semibold text-foreground hidden sm:inline">{loggedInUser.name}</span>
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
+              </button>
+
+              {showProfileMenu && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className="absolute right-0 top-full mt-2 w-56 bg-card/95 backdrop-blur-xl border border-border rounded-2xl shadow-2xl overflow-hidden"
+                >
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-sm font-bold text-foreground">{loggedInUser.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{loggedInUser.email}</p>
+                  </div>
+                  <div className="p-1">
+                    <button
+                      onClick={() => { setShowProfileMenu(false); setLocation("/track"); }}
+                      className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-foreground hover:bg-primary/10 rounded-xl transition-colors"
+                    >
+                      <Navigation className="w-4 h-4 text-primary" />
+                      My Orders
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Log Out
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 sm:gap-4 bg-background/30 backdrop-blur-md border border-border/50 rounded-full px-2 py-2">
+              <button
+                onClick={() => setLocation("/login")}
+                className="text-sm font-bold text-foreground hover:text-primary px-4 py-2 transition-colors"
+              >
+                Log In
+              </button>
+              <button
+                onClick={() => setLocation("/signup")}
+                className="text-sm font-bold bg-primary text-primary-foreground px-5 py-2.5 rounded-full hover:bg-primary/90 transition-all shadow-[0_0_15px_rgba(255,87,34,0.4)]"
+              >
+                Sign Up
+              </button>
+            </div>
+          )}
+        </div>
         {/* Parallax bg */}
         <motion.div className="absolute inset-0" style={{ y: heroImgY, scale: heroScale }}>
           <img src={shopPhoto} alt="Shakti Fast Food" className="w-full h-full object-cover" />

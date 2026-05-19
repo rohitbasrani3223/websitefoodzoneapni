@@ -75,6 +75,10 @@ export default function CartPage() {
       {
         onSuccess: (order) => {
           const shortId = `SKT-${String(order.id).padStart(4, "0")}`;
+          // Save order for auto-tracking
+          const existingOrders = JSON.parse(localStorage.getItem("my-orders") || "[]");
+          existingOrders.unshift(order.id);
+          localStorage.setItem("my-orders", JSON.stringify(existingOrders.slice(0, 20)));
           clearCart();
           // Navigate to track page WITH success popup trigger
           setLocation(`/track/${order.id}?new=${encodeURIComponent(shortId)}`);

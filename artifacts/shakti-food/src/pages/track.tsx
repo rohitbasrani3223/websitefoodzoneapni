@@ -110,10 +110,16 @@ function OrderSuccessPopup({ orderId, onClose }: { orderId: string; onClose: () 
   );
 }
 
-/* ── Search Page (when user visits /track without ID) ── */
-function TrackSearchPage() {
+/* ── My Orders Page (when user visits /track without ID) ── */
+function MyOrdersPage() {
   const [, setLocation] = useLocation();
+  const [orderIds, setOrderIds] = useState<number[]>([]);
   const [input, setInput] = useState("");
+
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem("my-orders") || "[]");
+    setOrderIds(saved);
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,38 +137,119 @@ function TrackSearchPage() {
           <button onClick={() => setLocation("/")} className="p-2 hover:bg-card rounded-xl transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-lg font-black text-foreground">Track Your Order</h1>
+          <h1 className="text-lg font-black text-foreground">My Orders</h1>
         </div>
       </div>
-      <div className="flex-1 flex items-center justify-center px-6 py-16">
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }} className="w-full max-w-md">
-          <div className="w-24 h-24 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-8">
-            <Navigation className="w-12 h-12 text-primary" />
+
+      <div className="max-w-xl mx-auto w-full px-4 py-6 space-y-5">
+        {/* Quick search bar */}
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search by ID (SKT-0001)..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              className="w-full bg-card border border-border rounded-xl pl-9 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/50 transition-colors"
+            />
           </div>
-          <h2 className="text-3xl font-black text-foreground text-center mb-2">Track Order</h2>
-          <p className="text-muted-foreground text-center text-sm mb-8">
-            Apna Order ID enter karo — jaise <span className="text-primary font-bold">SKT-0001</span>
-          </p>
-          <form onSubmit={handleSearch} className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="SKT-0001 ya sirf 1 likhein..."
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                autoFocus
-                className="w-full bg-card border border-border focus:border-primary/60 rounded-2xl pl-12 pr-4 py-4 text-foreground text-lg font-mono placeholder:text-muted-foreground focus:outline-none transition-colors"
-              />
+          <button type="submit" disabled={!input.trim()} className="bg-primary text-primary-foreground font-bold px-4 py-2.5 rounded-xl text-sm disabled:opacity-40 hover:bg-primary/90 transition-colors">
+            Track
+          </button>
+        </form>
+
+        {/* My Orders List */}
+        {orderIds.length > 0 ? (
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Your Recent Orders</p>
+            {orderIds.map((id) => (
+              <OrderCard key={id} orderId={id} onClick={() => setLocation(`/track/${id}`)} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="w-20 h-20 bg-primary/10 rounded-3xl flex items-center justify-center mb-6">
+              <Navigation className="w-10 h-10 text-primary" />
             </div>
-            <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }} type="submit" disabled={!input.trim()} className="w-full bg-primary hover:bg-primary/90 disabled:opacity-40 text-primary-foreground font-bold py-4 rounded-2xl text-lg transition-all glow-box">
-              Track Order 🔍
-            </motion.button>
-          </form>
-          <p className="text-xs text-muted-foreground text-center mt-6">Order ID aapko order place karne ke baad mila tha. Copy karke rakho!</p>
-        </motion.div>
+            <h2 className="text-2xl font-black text-foreground mb-2">No Orders Yet</h2>
+            <p className="text-muted-foreground text-sm mb-6">Jab aap order karenge, toh yahan aapke saare orders dikhenge!</p>
+            <button
+              onClick={() => setLocation("/menu")}
+              className="bg-primary text-primary-foreground font-bold px-8 py-3 rounded-xl hover:bg-primary/90 transition-colors"
+            >
+              Browse Menu
+            </button>
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+/* ── Single Order Card (shows live status) ── */
+function OrderCard({ orderId, onClick }: { orderId: number; onClick: () => void }) {
+  const { data: order, isLoading } = useGetOrder(orderId, {
+    query: { enabled: !!orderId, queryKey: getGetOrderQueryKey(orderId) },
+  });
+
+  if (isLoading) {
+    return (
+      <div className="bg-card border border-border rounded-2xl p-4 animate-pulse">
+        <div className="h-4 bg-muted rounded w-1/3 mb-2" />
+        <div className="h-3 bg-muted rounded w-2/3" />
+      </div>
+    );
+  }
+
+  if (!order) return null;
+
+  const statusColors: Record<string, string> = {
+    received: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+    preparing: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+    ready: "bg-green-500/15 text-green-400 border-green-500/30",
+    "out-for-delivery": "bg-primary/15 text-primary border-primary/30",
+    completed: "bg-green-600/15 text-green-500 border-green-600/30",
+    cancelled: "bg-red-500/15 text-red-400 border-red-500/30",
+  };
+
+  const statusLabels: Record<string, string> = {
+    received: "Order Received",
+    preparing: "Preparing 🍳",
+    ready: "Ready for Pickup ✅",
+    "out-for-delivery": "Out for Delivery 🛵",
+    completed: "Completed ✔️",
+    cancelled: "Cancelled ❌",
+  };
+
+  const isActive = !["completed", "cancelled"].includes(order.status);
+
+  return (
+    <motion.button
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
+      onClick={onClick}
+      className={`w-full text-left bg-card border rounded-2xl p-4 transition-all ${isActive ? "border-primary/30 shadow-[0_0_15px_rgba(255,87,34,0.08)]" : "border-border"}`}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-black text-foreground">SKT-{String(order.id).padStart(4, "0")}</span>
+        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${statusColors[order.status] || "bg-muted text-muted-foreground"}`}>
+          {statusLabels[order.status] || order.status}
+        </span>
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-muted-foreground">
+          {(order.items as Array<{ name: string }>).map((i) => i.name).join(", ")}
+        </div>
+        <span className="text-primary font-bold text-sm">₹{order.total}</span>
+      </div>
+      {isActive && (
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-primary font-semibold">
+          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          Live tracking — tap to view
+        </div>
+      )}
+    </motion.button>
   );
 }
 
@@ -200,8 +287,8 @@ export default function TrackPage() {
     return () => clearInterval(interval);
   }, [orderId, order?.status, queryClient]);
 
-  /* No ID → show search page */
-  if (!orderId) return <TrackSearchPage />;
+  /* No ID → show my orders page */
+  if (!orderId) return <MyOrdersPage />;
 
   if (!isLoading && !order) {
     return (
