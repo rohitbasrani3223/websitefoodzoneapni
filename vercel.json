@@ -1,0 +1,9 @@
+{
+  "buildCommand": "pnpm --filter @workspace/db exec tsc --build && pnpm --filter @workspace/api-client-react exec tsc --build && pnpm --filter @workspace/shakti-food build",
+  "outputDirectory": "artifacts/shakti-food/dist",
+  "installCommand": "pnpm install",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
