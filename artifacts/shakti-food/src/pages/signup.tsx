@@ -91,7 +91,7 @@ export default function CustomerSignupPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-foreground ml-1">Email Address</label>
+              <label className="text-sm font-medium text-foreground ml-1">Email Address <span className="text-muted-foreground text-xs font-normal">(Optional)</span></label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
@@ -99,7 +99,6 @@ export default function CustomerSignupPage() {
                   placeholder="name@example.com"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  required
                   className="w-full bg-background border border-input rounded-xl pl-12 pr-4 py-3.5 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                 />
               </div>
