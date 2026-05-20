@@ -95,7 +95,7 @@ export default function AdminLoginPage() {
           </form>
 
           <p className="text-center text-muted-foreground text-xs mt-4">
-            Default: admin / shakti123
+            
           </p>
         </div>
 
