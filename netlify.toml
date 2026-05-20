@@ -1,0 +1,13 @@
+[build]
+  base = "artifacts/shakti-food"
+  command = "pnpm install && pnpm --filter @workspace/db exec tsc --build && pnpm --filter @workspace/api-client-react exec tsc --build && pnpm --filter @workspace/shakti-food build"
+  publish = "artifacts/shakti-food/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  PNPM_VERSION = "9"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
