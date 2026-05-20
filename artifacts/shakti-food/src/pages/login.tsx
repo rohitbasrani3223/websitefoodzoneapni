@@ -190,6 +190,18 @@ export default function CustomerLoginPage() {
               Sign up
             </Link>
           </p>
+
+          {!isForgotMode && (
+            <>
+              <div className="border-t border-border/60 my-5" />
+              <p className="text-center text-muted-foreground text-xs">
+                Are you a seller?{" "}
+                <Link href="/admin" className="text-primary font-bold hover:underline">
+                  Admin Login
+                </Link>
+              </p>
+            </>
+          )}
         </div>
       </motion.div>
     </div>
