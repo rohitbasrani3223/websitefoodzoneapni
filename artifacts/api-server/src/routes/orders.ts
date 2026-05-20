@@ -47,6 +47,11 @@ router.post("/orders", async (req, res) => {
   const deliveryCharge = isDelivery ? DELIVERY_CHARGE : 0;
   const total = itemsTotal + deliveryCharge;
 
+  // Extract extra fields from body (not in zod schema yet, but safe to read)
+  const rawBody = req.body as Record<string, unknown>;
+  const paymentMethod = typeof rawBody.paymentMethod === "string" ? rawBody.paymentMethod : "cash";
+  const receiptImage = typeof rawBody.receiptImage === "string" ? rawBody.receiptImage : null;
+
   const [order] = await db.insert(ordersTable).values({
     customerName: data.customerName,
     phone: data.phone,
@@ -60,6 +65,8 @@ router.post("/orders", async (req, res) => {
     deliveryLandmark: isDelivery ? (data.deliveryLandmark ?? null) : null,
     deliveryArea: isDelivery ? (data.deliveryArea ?? null) : null,
     deliveryCharge: String(deliveryCharge),
+    paymentMethod,
+    receiptImage,
   }).returning();
 
   const menuItemIds = data.items.map((i) => i.menuItemId);
@@ -110,6 +117,24 @@ router.patch("/orders/:id/status", async (req, res) => {
   res.json(formatOrder(order));
 });
 
+// Delete order route
+router.delete("/orders/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "Invalid id" });
+    return;
+  }
+  const [deleted] = await db
+    .delete(ordersTable)
+    .where(eq(ordersTable.id, id))
+    .returning({ id: ordersTable.id });
+  if (!deleted) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+  res.json({ success: true, id: deleted.id });
+});
+
 function formatOrder(order: typeof ordersTable.$inferSelect) {
   return {
     id: order.id,
@@ -126,6 +151,8 @@ function formatOrder(order: typeof ordersTable.$inferSelect) {
     deliveryArea: order.deliveryArea ?? null,
     deliveryCharge: Number(order.deliveryCharge ?? 0),
     createdAt: order.createdAt.toISOString(),
+    paymentMethod: order.paymentMethod ?? "cash",
+    receiptImage: order.receiptImage ?? null,
   };
 }
 

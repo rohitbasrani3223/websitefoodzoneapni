@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Minus, Plus, Trash2, ShoppingBag, User, Phone, MapPin, FileText, Home, Navigation, Bike, Copy, Check, Star, ExternalLink, Smartphone, Clock, Upload, X, Trash } from "lucide-react";
-import { useCreateOrder } from "@workspace/api-client-react";
 import { useCart } from "@/context/cart";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,7 +32,7 @@ export default function CartPage() {
   const [submitting, setSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi">("cash");
   const [selectedUpiApp, setSelectedUpiApp] = useState<"phonepe" | "gpay" | "paytm" | "bhim" | null>(null);
-  const createOrder = useCreateOrder();
+
 
   const isDelivery = form.orderType === "delivery";
   const subtotal = total;
@@ -90,9 +89,12 @@ export default function CartPage() {
       ? `${form.notes || ""}\n[UPI Payment Verified - App: ${selectedUpiApp?.toUpperCase()} - Screenshot uploaded]`.trim()
       : form.notes;
 
-    createOrder.mutate(
-      {
-        data: {
+    try {
+      const apiBase = import.meta.env.VITE_API_URL ?? "";
+      const res = await fetch(`${apiBase}/api/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           customerName: form.name,
           phone: form.phone,
           items,
@@ -103,23 +105,22 @@ export default function CartPage() {
           deliveryLandmark: isDelivery ? (form.deliveryLandmark || null) : null,
           deliveryArea: isDelivery ? (form.deliveryArea || null) : null,
           deliveryCharge: deliveryCharge,
-        },
-      },
-      {
-        onSuccess: (order) => {
-          const shortId = `SKT-${String(order.id).padStart(4, "0")}`;
-          clearCart();
-          setShowUpiModal(false);
-          setScreenshot(null);
-          setScreenshotPreview(null);
-          setLocation(`/track/${order.id}?new=${encodeURIComponent(shortId)}`);
-        },
-        onError: () => {
-          toast({ title: "Order failed", description: "Something went wrong. Please try again.", variant: "destructive" });
-          setSubmitting(false);
-        },
-      }
-    );
+          paymentMethod,
+          receiptImage: paymentMethod === "upi" ? (screenshotPreview ?? null) : null,
+        }),
+      });
+      if (!res.ok) throw new Error("Server error");
+      const order = await res.json() as { id: number };
+      const shortId = `SKT-${String(order.id).padStart(4, "0")}`;
+      clearCart();
+      setShowUpiModal(false);
+      setScreenshot(null);
+      setScreenshotPreview(null);
+      setLocation(`/track/${order.id}?new=${encodeURIComponent(shortId)}`);
+    } catch {
+      toast({ title: "Order failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+      setSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -576,10 +577,10 @@ export default function CartPage() {
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           type="submit"
-          disabled={submitting || createOrder.isPending}
+          disabled={submitting}
           className="w-full bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-black py-4 rounded-2xl text-lg transition-all glow-box"
         >
-          {submitting || createOrder.isPending
+          {submitting
             ? "Placing Order..."
             : `Place Order — ₹${grandTotal}`}
         </motion.button>
@@ -705,11 +706,11 @@ export default function CartPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={!screenshot || submitting || createOrder.isPending}
+                  disabled={!screenshot || submitting}
                   onClick={executeOrderPlacement}
                   className="bg-primary hover:bg-primary/90 disabled:opacity-60 text-primary-foreground font-black py-3.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/25"
                 >
-                  {submitting || createOrder.isPending ? (
+                  {submitting ? (
                     "Processing..."
                   ) : (
                     <>

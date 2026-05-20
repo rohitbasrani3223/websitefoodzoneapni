@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ShoppingBag, TrendingUp, Clock, CheckCircle2, Utensils,
   LogOut, Plus, Edit2, Trash2, ToggleLeft, ToggleRight,
-  BarChart3, ChevronDown, X, Save, Bike, MapPin
+  BarChart3, X, Save, Bike, MapPin, Eye, Image, Banknote, Smartphone, AlertCircle
 } from "lucide-react";
 import {
   useGetDashboardStats,
@@ -37,12 +37,34 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 
 type Tab = "dashboard" | "orders" | "menu";
 
+// Extend the order type to include our new fields
+type OrderWithPayment = {
+  id: number;
+  customerName: string;
+  phone: string;
+  items: Array<{ name: string; price: number; quantity: number; menuItemId?: number }>;
+  total: number;
+  status: string;
+  orderType: string;
+  notes?: string | null;
+  tableNumber?: string | null;
+  deliveryAddress?: string | null;
+  deliveryLandmark?: string | null;
+  deliveryArea?: string | null;
+  deliveryCharge?: number | null;
+  createdAt: string;
+  paymentMethod?: string;
+  receiptImage?: string | null;
+};
+
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const [tab, setTab] = useState<Tab>("dashboard");
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("");
   const [showAddItem, setShowAddItem] = useState(false);
   const [editItem, setEditItem] = useState<number | null>(null);
+  const [viewOrderDetails, setViewOrderDetails] = useState<OrderWithPayment | null>(null);
+  const [viewReceipt, setViewReceipt] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -102,6 +124,23 @@ export default function AdminDashboard() {
     );
   };
 
+  const handleDeleteOrder = async (orderId: number) => {
+    if (!confirm("Kya aap is order ko permanently delete karna chahte hain?")) return;
+    try {
+      const apiBase = import.meta.env.VITE_API_URL ?? "";
+      const res = await fetch(`${apiBase}/api/orders/${orderId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      queryClient.invalidateQueries({ queryKey: getListOrdersQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetDashboardStatsQueryKey() });
+      toast({ title: "Order deleted", description: `Order #${orderId} delete ho gaya.` });
+      if (viewOrderDetails?.id === orderId) setViewOrderDetails(null);
+    } catch {
+      toast({ title: "Error", description: "Delete nahi hua. Try again.", variant: "destructive" });
+    }
+  };
+
+  const typedOrders = orders as unknown as OrderWithPayment[];
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -125,7 +164,7 @@ export default function AdminDashboard() {
       {/* Tabs */}
       <div className="bg-card border-b border-border px-4">
         <div className="max-w-6xl mx-auto flex gap-1">
-          {([["dashboard", "Dashboard"], ["orders", "Orders"], ["menu", "Menu"]] as [Tab, string][]).map(([key, label]) => (
+          {([ ["dashboard", "Dashboard"], ["orders", "Orders"], ["menu", "Menu"]] as [Tab, string][]).map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -207,15 +246,16 @@ export default function AdminDashboard() {
               ))}
             </div>
 
-            {orders.length === 0 ? (
+            {typedOrders.length === 0 ? (
               <div className="text-center py-16 text-muted-foreground">
                 <ShoppingBag className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p>No orders found</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {orders.map((order) => {
+                {typedOrders.map((order) => {
                   const isDelivery = order.orderType === "delivery";
+                  const isUpi = order.paymentMethod === "upi";
                   const validNextStatuses = ORDER_STATUSES.filter((s) => {
                     if (s === order.status || s === "received") return false;
                     if (s === "out-for-delivery" && !isDelivery) return false;
@@ -236,6 +276,18 @@ export default function AdminDashboard() {
                           </div>
                           <p className="text-muted-foreground text-xs">{order.phone} &middot; {isDelivery ? "Delivery" : order.orderType}</p>
                           <p className="text-muted-foreground text-xs">{new Date(order.createdAt).toLocaleString()}</p>
+                          {/* Payment Badge */}
+                          <div className="mt-1.5 flex items-center gap-1.5">
+                            {isUpi ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20 px-2 py-0.5 rounded-full">
+                                <Smartphone className="w-2.5 h-2.5" /> UPI
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-muted text-muted-foreground border border-border px-2 py-0.5 rounded-full">
+                                <Banknote className="w-2.5 h-2.5" /> Cash
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-primary font-black">₹{order.total}</p>
@@ -267,9 +319,38 @@ export default function AdminDashboard() {
                       )}
 
                       <div className="text-xs text-muted-foreground mb-3">
-                        {(order.items as Array<{ name: string; quantity: number }>).map((i, idx) => (
+                        {order.items.map((i, idx) => (
                           <span key={idx}>{i.name} ×{i.quantity}{idx < order.items.length - 1 ? ", " : ""}</span>
                         ))}
+                      </div>
+
+                      {/* Action Buttons row */}
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {/* See Details */}
+                        <button
+                          onClick={() => setViewOrderDetails(order)}
+                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors border bg-muted hover:bg-muted/80 text-foreground border-border"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> See Details
+                        </button>
+
+                        {/* View Receipt (only for UPI orders with receipt) */}
+                        {isUpi && order.receiptImage && (
+                          <button
+                            onClick={() => setViewReceipt(order.receiptImage!)}
+                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors border bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
+                          >
+                            <Image className="w-3.5 h-3.5" /> View Receipt
+                          </button>
+                        )}
+
+                        {/* Delete Order */}
+                        <button
+                          onClick={() => handleDeleteOrder(order.id)}
+                          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors border bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20 ml-auto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
                       </div>
 
                       {order.status !== "completed" && order.status !== "cancelled" && (
@@ -389,6 +470,219 @@ export default function AdminDashboard() {
           }}
         />
       )}
+
+      {/* ── Order Details Modal ── */}
+      <AnimatePresence>
+        {viewOrderDetails && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4 backdrop-blur-sm"
+            onClick={() => setViewOrderDetails(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.9, y: 20, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+              className="bg-card border border-border rounded-3xl w-full max-w-md shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-card/80">
+                <div>
+                  <h2 className="font-black text-foreground text-lg">Order #{viewOrderDetails.id}</h2>
+                  <p className="text-muted-foreground text-xs">{new Date(viewOrderDetails.createdAt).toLocaleString()}</p>
+                </div>
+                <button onClick={() => setViewOrderDetails(null)} className="p-2 hover:bg-muted rounded-xl text-muted-foreground hover:text-foreground transition-all">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+                {/* Customer Info */}
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Customer</p>
+                  <div className="bg-background rounded-xl p-3 space-y-1.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Name</span>
+                      <span className="font-semibold text-foreground">{viewOrderDetails.customerName}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Phone</span>
+                      <span className="font-semibold text-foreground">{viewOrderDetails.phone}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Order Info */}
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Order Info</p>
+                  <div className="bg-background rounded-xl p-3 space-y-1.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Type</span>
+                      <span className="font-semibold text-foreground capitalize">{viewOrderDetails.orderType}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Status</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${STATUS_COLORS[viewOrderDetails.status as OrderStatus] ?? "bg-muted"}`}>
+                        {viewOrderDetails.status}
+                      </span>
+                    </div>
+                    {/* Payment */}
+                    <div className="flex justify-between text-sm items-center">
+                      <span className="text-muted-foreground">Payment</span>
+                      {viewOrderDetails.paymentMethod === "upi" ? (
+                        <span className="flex items-center gap-1.5 text-green-400 font-semibold text-xs">
+                          <Smartphone className="w-3.5 h-3.5" /> UPI Payment
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 text-muted-foreground font-semibold text-xs">
+                          <Banknote className="w-3.5 h-3.5" /> Cash on Delivery
+                        </span>
+                      )}
+                    </div>
+                    {viewOrderDetails.tableNumber && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Table</span>
+                        <span className="font-semibold text-foreground">{viewOrderDetails.tableNumber}</span>
+                      </div>
+                    )}
+                    {viewOrderDetails.notes && (
+                      <div className="flex flex-col gap-0.5 text-sm">
+                        <span className="text-muted-foreground">Notes</span>
+                        <span className="font-medium text-foreground text-xs bg-muted/40 rounded-lg p-2 mt-0.5">{viewOrderDetails.notes}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Delivery Info */}
+                {viewOrderDetails.orderType === "delivery" && viewOrderDetails.deliveryAddress && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Delivery Address</p>
+                    <div className="bg-primary/5 border border-primary/15 rounded-xl p-3 space-y-1">
+                      {viewOrderDetails.deliveryArea && <p className="text-muted-foreground text-xs">{viewOrderDetails.deliveryArea}</p>}
+                      <p className="text-foreground text-sm font-medium">{viewOrderDetails.deliveryAddress}</p>
+                      {viewOrderDetails.deliveryLandmark && <p className="text-muted-foreground text-xs">Near: {viewOrderDetails.deliveryLandmark}</p>}
+                    </div>
+                  </div>
+                )}
+
+                {/* Items */}
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Items Ordered</p>
+                  <div className="bg-background rounded-xl p-3 space-y-2">
+                    {viewOrderDetails.items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{item.name} × {item.quantity}</span>
+                        <span className="text-foreground font-medium">₹{item.price * item.quantity}</span>
+                      </div>
+                    ))}
+                    {viewOrderDetails.orderType === "delivery" && (viewOrderDetails.deliveryCharge ?? 0) > 0 && (
+                      <div className="flex justify-between text-sm text-primary border-t border-border pt-2">
+                        <span className="flex items-center gap-1"><Bike className="w-3 h-3" /> Delivery</span>
+                        <span>₹{viewOrderDetails.deliveryCharge}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-black text-base border-t border-border pt-2">
+                      <span className="text-foreground">Total</span>
+                      <span className="text-primary">₹{viewOrderDetails.total}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* UPI Receipt Preview */}
+                {viewOrderDetails.paymentMethod === "upi" && viewOrderDetails.receiptImage && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-green-400" />
+                      Payment Receipt
+                    </p>
+                    <div className="border border-green-500/20 rounded-xl overflow-hidden">
+                      <img
+                        src={viewOrderDetails.receiptImage}
+                        alt="UPI Payment Receipt"
+                        className="w-full h-auto object-contain max-h-64 bg-background"
+                      />
+                      <div className="px-3 py-2 bg-green-500/5 border-t border-green-500/10">
+                        <p className="text-xs text-green-400 font-semibold flex items-center gap-1.5">
+                          <Smartphone className="w-3 h-3" />
+                          UPI payment screenshot — customer dwara uploaded
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {viewOrderDetails.paymentMethod === "upi" && !viewOrderDetails.receiptImage && (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                    <p className="text-xs text-amber-400 font-medium">UPI payment selected but receipt upload nahi ki gai</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-border flex gap-3">
+                <button
+                  onClick={() => handleDeleteOrder(viewOrderDetails.id)}
+                  className="flex items-center gap-1.5 bg-destructive/10 hover:bg-destructive/20 text-destructive font-bold px-4 py-2.5 rounded-xl text-sm transition-all border border-destructive/20"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete Order
+                </button>
+                <button
+                  onClick={() => setViewOrderDetails(null)}
+                  className="flex-1 bg-muted hover:bg-muted/80 text-foreground font-bold py-2.5 rounded-xl text-sm transition-all"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Receipt Fullscreen Viewer ── */}
+      <AnimatePresence>
+        {viewReceipt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
+            onClick={() => setViewReceipt(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.85, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 28 }}
+              className="relative max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setViewReceipt(null)}
+                className="absolute -top-10 right-0 text-white/70 hover:text-white text-sm font-bold flex items-center gap-1 transition-colors"
+              >
+                <X className="w-4 h-4" /> Close
+              </button>
+              <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-2xl">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-green-500/10">
+                  <Image className="w-4 h-4 text-green-400" />
+                  <p className="text-sm font-bold text-green-400">UPI Payment Receipt</p>
+                </div>
+                <img
+                  src={viewReceipt}
+                  alt="UPI Receipt"
+                  className="w-full h-auto object-contain max-h-[70vh]"
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

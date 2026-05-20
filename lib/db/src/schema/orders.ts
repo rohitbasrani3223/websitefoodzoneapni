@@ -24,6 +24,8 @@ export const ordersTable = pgTable("orders", {
   deliveryArea: text("delivery_area"),
   deliveryCharge: numeric("delivery_charge", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  paymentMethod: text("payment_method").notNull().default("cash"),
+  receiptImage: text("receipt_image"),
 });
 
 export const insertOrderSchema = createInsertSchema(ordersTable).omit({ id: true, createdAt: true });

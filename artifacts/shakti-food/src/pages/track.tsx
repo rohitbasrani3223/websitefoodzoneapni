@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, CheckCircle2, Clock, ChefHat, Bell, XCircle, Bike, MapPin, Search, Navigation, Copy, Check, Star, ExternalLink } from "lucide-react";
-import { useGetOrder, getGetOrderQueryKey } from "@workspace/api-client-react";
+import { ArrowLeft, CheckCircle2, Clock, ChefHat, Bell, XCircle, Bike, MapPin, Search, Navigation, Copy, Check, Star, ExternalLink, Smartphone, Banknote, AlertCircle } from "lucide-react";
+import { useGetOrder, getGetOrderQueryKey, useUpdateOrderStatus } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 const PICKUP_STEPS = [
   { key: "received", label: "Order Received", icon: Bell, desc: "We got your order!" },
@@ -277,11 +278,41 @@ function OrderCard({ orderId, onClick }: { orderId: number; onClick: () => void 
   );
 }
 
+/* ── Cancel Timer Hook ── */
+function useCancelTimer(createdAt: string | undefined) {
+  const [secondsLeft, setSecondsLeft] = useState<number>(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!createdAt) return;
+    const CANCEL_WINDOW = 5 * 60 * 1000; // 5 minutes
+
+    const tick = () => {
+      const elapsed = Date.now() - new Date(createdAt).getTime();
+      const remaining = Math.max(0, Math.ceil((CANCEL_WINDOW - elapsed) / 1000));
+      setSecondsLeft(remaining);
+      if (remaining <= 0 && intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+
+    tick();
+    intervalRef.current = setInterval(tick, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [createdAt]);
+
+  return secondsLeft;
+}
+
 export default function TrackPage() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute("/track/:id");
   const orderId = match && params ? Number(params.id) : 0;
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [cancelling, setCancelling] = useState(false);
 
   // Read ?new=SKT-XXXX from URL to show success popup
   const urlParams = new URLSearchParams(window.location.search);
@@ -300,8 +331,14 @@ export default function TrackPage() {
     query: { enabled: !!orderId, queryKey: getGetOrderQueryKey(orderId) },
   });
 
+  const updateStatus = useUpdateOrderStatus();
+
   const isDelivery = order?.orderType === "delivery";
   const steps: readonly Step[] = isDelivery ? DELIVERY_STEPS : PICKUP_STEPS;
+
+  // Cancel timer
+  const secondsLeft = useCancelTimer(order?.createdAt);
+  const canCancel = secondsLeft > 0 && order?.status === "received";
 
   useEffect(() => {
     if (!orderId || order?.status === "completed" || order?.status === "cancelled") return;
@@ -310,6 +347,31 @@ export default function TrackPage() {
     }, 5000);
     return () => clearInterval(interval);
   }, [orderId, order?.status, queryClient]);
+
+  const handleCancelOrder = async () => {
+    if (!order || !canCancel) return;
+    setCancelling(true);
+    updateStatus.mutate(
+      { id: order.id, data: { status: "cancelled" } },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetOrderQueryKey(order.id) });
+          toast({ title: "Order Cancelled", description: "Aapka order cancel ho gaya hai." });
+          setCancelling(false);
+        },
+        onError: () => {
+          toast({ title: "Error", description: "Cancel nahi ho saka. Please try again.", variant: "destructive" });
+          setCancelling(false);
+        },
+      }
+    );
+  };
+
+  const formatCancelTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  };
 
   /* No ID → show my orders page */
   if (!orderId) return <MyOrdersPage />;
@@ -338,6 +400,7 @@ export default function TrackPage() {
   const currentStepIndex = getStepIndex(steps, order.status);
   const isCancelled = order.status === "cancelled";
   const currentStep = steps[Math.max(0, currentStepIndex)];
+  const paymentMethod = (order as Record<string, unknown>).paymentMethod as string | undefined;
 
   return (
     <>
@@ -394,6 +457,43 @@ export default function TrackPage() {
               </>
             )}
           </motion.div>
+
+          {/* ── Cancel Order Section (only if within 5 minutes and status is 'received') ── */}
+          {!isCancelled && order.status !== "completed" && canCancel && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-destructive/5 border border-destructive/20 rounded-2xl p-4"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-destructive" />
+                    Cancel Order
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Sirf {formatCancelTime(secondsLeft)} bachi hai cancel karne ki
+                  </p>
+                </div>
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  whileHover={{ scale: 1.03 }}
+                  disabled={cancelling}
+                  onClick={handleCancelOrder}
+                  className="bg-destructive/10 hover:bg-destructive/20 text-destructive font-bold px-4 py-2.5 rounded-xl text-sm transition-all border border-destructive/20 disabled:opacity-60 flex items-center gap-1.5"
+                >
+                  {cancelling ? (
+                    <div className="w-4 h-4 border-2 border-destructive/30 border-t-destructive rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4" />
+                      Cancel ({formatCancelTime(secondsLeft)})
+                    </>
+                  )}
+                </motion.button>
+              </div>
+            </motion.div>
+          )}
 
           {/* Progress Steps */}
           {!isCancelled && (
@@ -485,6 +585,15 @@ export default function TrackPage() {
                   {order.orderType}
                 </span>
               </div>
+              {/* Payment Mode */}
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Payment</span>
+                <span className={`font-semibold text-sm flex items-center gap-1.5 ${paymentMethod === "upi" ? "text-green-400" : "text-foreground"}`}>
+                  {paymentMethod === "upi"
+                    ? <><Smartphone className="w-3.5 h-3.5" /> UPI Payment</>
+                    : <><Banknote className="w-3.5 h-3.5" /> Cash on Delivery</>}
+                </span>
+              </div>
               {order.tableNumber && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Table</span>
@@ -523,4 +632,3 @@ export default function TrackPage() {
     </>
   );
 }
-
