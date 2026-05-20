@@ -19,7 +19,7 @@ run = "pnpm --filter @workspace/shakti-food run dev"
 
 [services.production]
 build = [ "pnpm", "--filter", "@workspace/shakti-food", "run", "build" ]
-publicDir = "artifacts/shakti-food/dist/public"
+publicDir = "artifacts/shakti-food/dist"
 serve = "static"
 
 [[services.production.rewrites]]
