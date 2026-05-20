@@ -6,7 +6,7 @@ import { useListMenuItems, useListCategories, getListMenuItemsQueryKey } from "@
 import { useCart } from "@/context/cart";
 
 /* Reusable fade+rise entrance */
-const fadeUp = {
+const fadeUp: any = {
   hidden: { opacity: 0, y: 28, filter: "blur(6px)" },
   show: (i: number) => ({
     opacity: 1, y: 0, filter: "blur(0px)",

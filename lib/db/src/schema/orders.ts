@@ -23,7 +23,7 @@ export const ordersTable = pgTable("orders", {
   deliveryLandmark: text("delivery_landmark"),
   deliveryArea: text("delivery_area"),
   deliveryCharge: numeric("delivery_charge", { precision: 10, scale: 2 }).default("0"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const insertOrderSchema = createInsertSchema(ordersTable).omit({ id: true, createdAt: true });
