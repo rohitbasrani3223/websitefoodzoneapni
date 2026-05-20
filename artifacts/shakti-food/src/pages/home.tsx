@@ -765,16 +765,16 @@ export default function Home() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <motion.a
-                href="tel:+918959551315"
+                href="tel:+917400666523"
                 whileHover={{ scale: 1.04, boxShadow: "0 0 30px rgba(255,122,0,0.3)" }}
                 whileTap={{ scale: 0.97 }}
                 className="inline-flex items-center gap-2 bg-primary text-primary-foreground font-bold px-7 py-3.5 rounded-xl hover:bg-primary/90 transition-colors glow-box"
               >
                 <Phone className="w-4 h-4" />
-                Call: 8959551315
+                Call: 7400666523
               </motion.a>
               <motion.a
-                href="https://maps.google.com/?q=Shakti+Fast+Food+Sagar+Railway+Station"
+                href="https://maps.app.goo.gl/j4RX2C2AF4yAwPHv9"
                 target="_blank"
                 rel="noopener noreferrer"
                 whileHover={{ scale: 1.04 }}
