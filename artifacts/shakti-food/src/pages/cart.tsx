@@ -19,15 +19,39 @@ export default function CartPage() {
   const [, setLocation] = useLocation();
   const { items, removeItem, updateQuantity, clearCart, total } = useCart();
   const { toast } = useToast();
-  const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    orderType: "takeaway" as OrderType,
-    tableNumber: "",
-    notes: "",
-    deliveryAddress: "",
-    deliveryLandmark: "",
-    deliveryArea: "",
+  const [form, setForm] = useState(() => {
+    let defaultName = "";
+    let defaultPhone = "";
+    let defaultAddress = "";
+    let defaultLandmark = "";
+    let defaultArea = "";
+    
+    try {
+      const userStr = localStorage.getItem("customer-user");
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        defaultName = user.name || "";
+        defaultPhone = user.phone || "";
+      }
+      const addrStr = localStorage.getItem("shakti-delivery-address");
+      if (addrStr) {
+        const addr = JSON.parse(addrStr);
+        defaultAddress = addr.address || "";
+        defaultLandmark = addr.landmark || "";
+        defaultArea = addr.area || "";
+      }
+    } catch (e) {}
+
+    return {
+      name: defaultName,
+      phone: defaultPhone,
+      orderType: "takeaway" as OrderType,
+      tableNumber: "",
+      notes: "",
+      deliveryAddress: defaultAddress,
+      deliveryLandmark: defaultLandmark,
+      deliveryArea: defaultArea,
+    };
   });
   const [submitting, setSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi">("cash");
@@ -112,6 +136,28 @@ export default function CartPage() {
       if (!res.ok) throw new Error("Server error");
       const order = await res.json() as { id: number };
       const shortId = `SKT-${String(order.id).padStart(4, "0")}`;
+      
+      try {
+        const savedOrders = JSON.parse(localStorage.getItem("my-orders") || "[]");
+        if (!savedOrders.includes(order.id)) {
+          localStorage.setItem("my-orders", JSON.stringify([order.id, ...savedOrders]));
+        }
+        
+        if (isDelivery) {
+          localStorage.setItem("shakti-delivery-address", JSON.stringify({
+            address: form.deliveryAddress,
+            landmark: form.deliveryLandmark,
+            area: form.deliveryArea
+          }));
+        }
+        
+        const userStr = localStorage.getItem("customer-user");
+        const user = userStr ? JSON.parse(userStr) : {};
+        localStorage.setItem("customer-user", JSON.stringify({ ...user, name: form.name, phone: form.phone }));
+      } catch (e) {
+        console.error("Local storage error:", e);
+      }
+
       clearCart();
       setShowUpiModal(false);
       setScreenshot(null);
